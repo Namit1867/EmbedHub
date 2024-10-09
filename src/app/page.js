@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import RepoList from './components/RepoList';
-import { useSession, signIn } from 'next-auth/react';
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 export default function Home() {
   const { data: session } = useSession();
@@ -28,8 +28,8 @@ export default function Home() {
   useEffect(() => {
     if (!!session) {
       // Check if GitHub or Google Drive is connected
-      setIsGitHubConnected(session.provider == "github" ? true : false);
-      setIsGoogleConnected(session.provider == "google" ? true : false);
+      setIsGitHubConnected(session.provider === "github");
+      setIsGoogleConnected(session.provider === "google");
     }
   }, [session]);
 
@@ -109,13 +109,21 @@ export default function Home() {
     }
   };
 
+  // Handle disconnect from GitHub and go back to option selection
+  const handleGoBack = () => {
+    signOut();
+    setIsGitHubConnected(false);
+    setIsGoogleConnected(false);
+  };
+
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Select Repositories and Google Drive Files to Scrape</h1>
 
-      {/* GitHub Connect/Fetch Section */}
+      {/* GitHub Section */}
       {isGitHubConnected ? (
         <>
+          <button onClick={handleGoBack} style={styles.goBackButton}>Go Back</button>
           {loading ? (
             <p>Loading...</p>
           ) : (
@@ -138,14 +146,17 @@ export default function Home() {
             </button>
           </div>
         </>
-      ) : (
-        <button onClick={() => signIn('github')} style={styles.connectButton}>Connect to GitHub</button>
-      )}
+      ) : !isGoogleConnected ? (
+        <>
+          <button onClick={() => signIn('github')} style={styles.connectButton}>Connect to GitHub</button>
+          <button onClick={() => signIn('google')} style={styles.connectButton}>Connect to Google Drive</button>
+        </>
+      ) : null}
 
       {/* Google Drive Section */}
-      <h2 style={styles.subTitle}>Google Drive Files</h2>
-      {isGoogleConnected ? (
+      {isGoogleConnected && !isGitHubConnected ? (
         <>
+          <button onClick={handleGoBack} style={styles.goBackButton}>Go Back</button>
           <button onClick={fetchGoogleDriveFiles} style={styles.button}>Fetch Google Drive Files</button>
 
           <ul style={styles.fileList}>
@@ -154,9 +165,7 @@ export default function Home() {
             ))}
           </ul>
         </>
-      ) : (
-        <button onClick={() => signIn('google')} style={styles.connectButton}>Connect to Google Drive</button>
-      )}
+      ) : null}
 
       {/* Selected Repositories */}
       <h2 style={styles.subTitle}>Selected Repositories:</h2>
@@ -198,6 +207,16 @@ const styles = {
     margin: '20px auto',
     padding: '10px 20px',
     backgroundColor: '#0070f3',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  goBackButton: {
+    display: 'block',
+    margin: '20px auto',
+    padding: '10px 20px',
+    backgroundColor: '#ff6347',
     color: '#fff',
     border: 'none',
     borderRadius: '5px',
