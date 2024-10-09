@@ -1,24 +1,26 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-const RepoList = ({ repositories, onSelectionChange }) => {
-  const [selectedRepos, setSelectedRepos] = useState([]);
+const RepoList = ({ repositories, onSelectionChange, selectedRepos }) => {
+  const [selectedRepoIds, setSelectedRepoIds] = useState([]);
+
+  useEffect(() => {
+    setSelectedRepoIds(selectedRepos.map(repo => repo.id)); // Sync selected repositories
+  }, [selectedRepos]);
 
   const handleSelectionChange = (repo) => {
-    const isSelected = selectedRepos.includes(repo);
+    const isSelected = selectedRepoIds.includes(repo.id);
+    const updatedSelection = isSelected
+      ? selectedRepos.filter(r => r.id !== repo.id)
+      : [...selectedRepos, repo];
 
-    if (isSelected) {
-      setSelectedRepos(selectedRepos.filter((r) => r !== repo));
-    } else {
-      setSelectedRepos([...selectedRepos, repo]);
-    }
-
-    onSelectionChange(isSelected ? selectedRepos.filter((r) => r !== repo) : [...selectedRepos, repo]);
+    setSelectedRepoIds(updatedSelection.map(repo => repo.id));
+    onSelectionChange(updatedSelection);
   };
 
   return (
     <div>
-      <h2>Select Repositories</h2>
+      <h2>Select Github Repositories</h2>
       <ul>
         {repositories.map((repo) => (
           <li key={repo.id} className="repo-item">

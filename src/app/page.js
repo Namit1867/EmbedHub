@@ -1,23 +1,84 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import RepoList from './components/RepoList';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const [repositories, setRepositories] = useState([]);
   const [selectedRepos, setSelectedRepos] = useState([]);
+  const [googleDriveFiles, setGoogleDriveFiles] = useState([]);
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);  // Tracks if there are more repos to fetch
+  const perPage = 10; // Number of repositories per page
+  const [isGitHubConnected, setIsGitHubConnected] = useState(false); // Track GitHub connection
+  const [isGoogleConnected, setIsGoogleConnected] = useState(false); // Track Google Drive connection
 
+  // Fetch GitHub repositories
   useEffect(() => {
-    // Fetch repositories from the API
-    fetch('/api/github-repos')
-      .then((res) => res.json())
-      .then((data) => setRepositories(data));
-  }, []);
+    if (isGitHubConnected && session?.accessToken) {
+      fetchRepositories();
+    }
+  }, [page, query, isGitHubConnected]);
 
-  const handleRepoSelectionChange = (selected) => {
-    setSelectedRepos(selected);
+  // Check if user is connected to GitHub or Google Drive
+  useEffect(() => {
+    if (!!session) {
+      // Check if GitHub or Google Drive is connected
+      setIsGitHubConnected(session.provider == "github" ? true : false);
+      setIsGoogleConnected(session.provider == "google" ? true : false);
+    }
+  }, [session]);
+
+  // Fetch Github Repositories
+  const fetchRepositories = async () => {
+    setLoading(true);
+
+    const response = await fetch(`/api/github-repos?page=${page}&per_page=${perPage}&query=${query}`);
+    const data = await response.json();
+
+    if (data.error) {
+      console.error(data.error);
+    } else {
+      setRepositories(data);
+
+      // If no repositories are returned, disable the "Next" button
+      if (data.length === 0) {
+        setHasMore(false);  // No more repositories to fetch
+      } else {
+        setHasMore(true);   // There are more repositories to fetch
+      }
+    }
+
+    setLoading(false);
+  };
+
+  // Fetch Google Drive files
+  const fetchGoogleDriveFiles = async () => {
+    setLoading(true);
+    const response = await fetch('/api/google-drive-files');
+    const data = await response.json();
+
+    if (data.error) {
+      console.error(data.error);
+    } else {
+      setGoogleDriveFiles(data.files);
+    }
+
+    setLoading(false);
+  };
+
+  const handlePageChange = (newPage) => {
+    if (newPage > 0 && hasMore) { // Only allow page change if more repos exist
+      setPage(newPage);
+    }
+  };
+
+  const handleRepoSelectionChange = (updatedSelection) => {
+    setSelectedRepos(updatedSelection); // Persist selected repos across pages
   };
 
   const handleProceedWithScraping = async () => {
@@ -46,51 +107,156 @@ export default function Home() {
     } else {
       console.error('Text area with id "outputText" not found.');
     }
-  
-    // // Download the ZIP file
-    // const blob = new Blob([data.zipContent], { type: 'application/zip' });
-    // const url = URL.createObjectURL(blob);
-    // const a = document.createElement('a');
-    // a.href = url;
-    // a.download = 'repository_contents.zip';
-    // a.click();
-    // URL.revokeObjectURL(url);
   };
-  
 
   return (
-    <div>
-      <h1>GitHub Repository Selector</h1>
-      {repositories.length > 0 ? (
+    <div style={styles.container}>
+      <h1 style={styles.title}>Select Repositories and Google Drive Files to Scrape</h1>
+
+      {/* GitHub Connect/Fetch Section */}
+      {isGitHubConnected ? (
         <>
-          <RepoList repositories={repositories} onSelectionChange={handleRepoSelectionChange} />
-          <button onClick={handleProceedWithScraping} disabled={selectedRepos.length === 0}>
-            Proceed with Scraping Data
-          </button>
+          {loading ? (
+            <p>Loading...</p>
+          ) : (
+            <RepoList
+              repositories={repositories}
+              onSelectionChange={handleRepoSelectionChange}
+              selectedRepos={selectedRepos}
+              style={styles.repoList}
+            />
+          )}
+
+          {/* Pagination Buttons */}
+          <div style={styles.pagination}>
+            <button onClick={() => handlePageChange(page - 1)} disabled={page === 1 || loading} style={styles.button}>
+              Previous
+            </button>
+            <span style={styles.pageNumber}>Page {page}</span>
+            <button onClick={() => handlePageChange(page + 1)} disabled={!hasMore || loading} style={styles.button}>
+              Next
+            </button>
+          </div>
         </>
       ) : (
-        <p>Loading repositories...</p>
+        <button onClick={() => signIn('github')} style={styles.connectButton}>Connect to GitHub</button>
       )}
 
-      <style jsx>{`
-        button {
-          padding: 10px 20px;
-          margin-top: 20px;
-          background-color: #0070f3;
-          color: white;
-          border: none;
-          border-radius: 5px;
-          cursor: pointer;
-        }
-        button:disabled {
-          background-color: #ccc;
-          cursor: not-allowed;
-        }
-      `}</style>
+      {/* Google Drive Section */}
+      <h2 style={styles.subTitle}>Google Drive Files</h2>
+      {isGoogleConnected ? (
+        <>
+          <button onClick={fetchGoogleDriveFiles} style={styles.button}>Fetch Google Drive Files</button>
 
-      <textarea id="outputText" style={{ width: '100%', height: '200px' }}></textarea>
+          <ul style={styles.fileList}>
+            {googleDriveFiles.map((file) => (
+              <li key={file.id} style={styles.fileItem}>{file.name}</li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <button onClick={() => signIn('google')} style={styles.connectButton}>Connect to Google Drive</button>
+      )}
 
+      {/* Selected Repositories */}
+      <h2 style={styles.subTitle}>Selected Repositories:</h2>
+      <ul style={styles.repoList}>
+        {selectedRepos.map(repo => (
+          <li key={repo.id} style={styles.repoItem}>{repo.name}</li>
+        ))}
+      </ul>
+
+      {/* Proceed to Scrape Button */}
+      <button onClick={handleProceedWithScraping} disabled={selectedRepos.length === 0} style={styles.scrapeButton}>
+        Proceed with Scraping
+      </button>
+
+      <textarea id="outputText" style={styles.textArea}></textarea>
     </div>
-    
   );
 }
+
+// Inline CSS Styles
+const styles = {
+  container: {
+    width: '80%',
+    margin: '0 auto',
+    padding: '20px',
+    fontFamily: 'Arial, sans-serif',
+  },
+  title: {
+    textAlign: 'center',
+    color: '#333',
+  },
+  subTitle: {
+    fontSize: '1.5em',
+    color: '#333',
+    marginTop: '20px',
+  },
+  connectButton: {
+    display: 'block',
+    margin: '20px auto',
+    padding: '10px 20px',
+    backgroundColor: '#0070f3',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  button: {
+    margin: '10px',
+    padding: '10px 20px',
+    backgroundColor: '#0070f3',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  pagination: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: '20px',
+  },
+  pageNumber: {
+    fontSize: '1.2em',
+    margin: '0 20px',
+  },
+  repoList: {
+    listStyleType: 'none',
+    padding: 0,
+  },
+  repoItem: {
+    padding: '10px',
+    borderBottom: '1px solid #ddd',
+    marginBottom: '10px',
+  },
+  fileList: {
+    listStyleType: 'none',
+    padding: 0,
+  },
+  fileItem: {
+    padding: '10px',
+    borderBottom: '1px solid #ddd',
+    marginBottom: '10px',
+  },
+  scrapeButton: {
+    display: 'block',
+    margin: '20px auto',
+    padding: '10px 20px',
+    backgroundColor: '#28a745',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  textArea: {
+    width: '100%',
+    height: '200px',
+    marginTop: '20px',
+    padding: '10px',
+    fontSize: '1em',
+    borderRadius: '5px',
+    border: '1px solid #ddd',
+  }
+};

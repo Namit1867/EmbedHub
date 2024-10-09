@@ -12,9 +12,21 @@ function parseRepoUrl(url) {
   return {
     owner: match[1],
     repo: match[2],
-    refFromUrl: match[4],
-    pathFromUrl: match[6],
+    refFromUrl: match[4], // Branch or tag if specified in URL
+    pathFromUrl: match[6], // Path if specified in URL
   };
+}
+
+// Fetch default branch of the repository
+async function fetchDefaultBranch(owner, repo, token) {
+  const url = `https://api.github.com/repos/${owner}/${repo}`;
+  const headers = {
+    Authorization: token ? `token ${token}` : '',
+  };
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error(`Failed to fetch repository details: ${response.status}`);
+  const data = await response.json();
+  return data.default_branch;
 }
 
 // Fetch repository SHA
@@ -80,9 +92,6 @@ export async function POST(request) {
   try {
     const { selectedRepos, token } = await request.json();
 
-    console.log('Selected Repos:', selectedRepos);
-    console.log('Token:', token);
-
     if (!selectedRepos || selectedRepos.length === 0) {
       throw new Error('No repositories selected.');
     }
@@ -91,16 +100,14 @@ export async function POST(request) {
 
     // Loop through each selected repository and scrape it
     for (const repoObj of selectedRepos) {
-      // Parse repository URL
       const repoUrl = repoObj.html_url;
-
-      console.log('Selected Repo:', repoUrl);
-      console.log('Token:', token);
-
       const { owner, repo, refFromUrl, pathFromUrl } = parseRepoUrl(repoUrl);
 
+      // Fetch the default branch if no branch is specified in the URL
+      const defaultBranch = refFromUrl || await fetchDefaultBranch(owner, repo, token);
+
       // Fetch the SHA and tree structure of the repository
-      const sha = await fetchRepoSha(owner, repo, refFromUrl, pathFromUrl, token);
+      const sha = await fetchRepoSha(owner, repo, defaultBranch, pathFromUrl, token);
       const tree = await fetchRepoTree(owner, repo, sha, token);
 
       // Filter out files (for example, select all files)
@@ -110,7 +117,7 @@ export async function POST(request) {
       const fileContents = await fetchFileContents(
         selectedFiles.map((file) => ({
           path: file.path,
-          url: `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}?ref=${refFromUrl || 'main'}`,
+          url: `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}?ref=${defaultBranch}`,
         })),
         token
       );
