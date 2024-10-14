@@ -3,6 +3,7 @@ import { OpenAI } from 'openai';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { CharacterTextSplitter } from "langchain/text_splitter";
 import { v4 as uuidv4 } from 'uuid';
+import { NextResponse } from 'next/server';
 
 const openai = new OpenAI({apiKey: process.env.OPENAI_API_KEY || ""});
 
@@ -20,26 +21,27 @@ export async function POST(request) {
 
   try {
 
-    const chunks = await splitter.createDocuments([text]);
+    const documents = await splitter.createDocuments([text]);
 
     //metadata
     let metadata = [];
+    let chunks = [];
 
-    for (let i = 0; i < chunks.length; i++) {
+    for (let i = 0; i < documents.length; i++) {
       metadata.push({
-        "text": chunks[i].pageContent,
+        "text": documents[i].pageContent,
         "resourceId": resourceId
       });
+      chunks.push(documents[i].pageContent);
     }
 
-    console.log(metadata)
-
-    
     // Create embeddings using OpenAI
     const embeddingResponse = await openai.embeddings.create({
       model: 'text-embedding-ada-002',
       input: chunks,
     });
+
+    console.log("Embedding Response:", embeddingResponse)
 
     const embeddings = embeddingResponse.data;
 
@@ -48,7 +50,7 @@ export async function POST(request) {
     const ids: string[] = Array.from({ length: embeddings.length }, () => uuidv4());
 
     // Prepare vector objects for Pinecone upsert
-    const upsertVectors = ids.map((id, idx) => ({
+    const upsertVectors : any = ids.map((id, idx) => ({
         id,
         values: vectors[idx],
         metadata: metadata[idx],
@@ -65,10 +67,20 @@ export async function POST(request) {
     }
 
     // Upsert the vectors and metadata into the Pinecone index
-    const index = pinecone.Index(pinecone_index);
-    await index.upsert([{id: namespace, values: embeddings, metadata:metadata}]);
+    const pinecone_index_instance = pinecone.Index(pinecone_index);
+    console.log("upsertVectors", upsertVectors)
+
+    const res = await pinecone_index_instance.namespace(namespace).upsert(
+      [
+        ...upsertVectors
+      ],
+    )
+
+    return NextResponse.json({
+      res
+    });
 
   } catch (error) {
-    console.error({ error: 'Failed to create embeddings' });
+    console.error({ error: error });
   }
 }

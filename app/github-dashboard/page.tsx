@@ -96,7 +96,7 @@ const Dashboard = () => {
     const response = await fetch('/api/create-embeddings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: scrapedContent, provider: "github", namespace:`${owner}/${selectedRepo}/${selectedBranch}`, resourceId: `github/${owner}` }),
+      body: JSON.stringify({ text: scrapedContent, provider: "github", namespace:`${owner}/${selectedRepo?.name}/${selectedBranch}`, resourceId: `github/${owner}` }),
     });
 
     if (response.ok) {
