@@ -22,7 +22,7 @@ const Dashboard = () => {
   // Fetch GitHub repositories
   const fetchRepositories = async (page: number) => {
     try {
-      const response = await fetch(`https://api.github.com/user/repos?per_page=10&page=${page}`, {
+      const response = await fetch(`https://api.github.com/user/repos?per_page=10&page=${page}&type=owner`, {
         headers: { Authorization: `token ${session?.accessToken}` },
       });
       if (response.status != 200) handleDisconnect();
@@ -96,7 +96,7 @@ const Dashboard = () => {
     const response = await fetch('/api/create-embeddings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: scrapedContent, provider: "github", namespace:`${owner}/${selectedRepo}/${selectedBranch}` }),
+      body: JSON.stringify({ text: scrapedContent, provider: "github", namespace:`${owner}/${selectedRepo}/${selectedBranch}`, resourceId: `github/${owner}` }),
     });
 
     if (response.ok) {
