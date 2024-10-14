@@ -11,11 +11,13 @@ const Dashboard = () => {
 
   const [repositories, setRepositories] = useState<any[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
+  const [owner, setOwner] = useState<string | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<any | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
   const [page, setPage] = useState<number>(1);
   const [scraping, setScraping] = useState(false);
   const [scrapedContent, setScrapedContent] = useState<string | null>(null);
+  const [embedding, setEmbedding] = useState(false);
 
   // Fetch GitHub repositories
   const fetchRepositories = async (page: number) => {
@@ -23,8 +25,7 @@ const Dashboard = () => {
       const response = await fetch(`https://api.github.com/user/repos?per_page=10&page=${page}`, {
         headers: { Authorization: `token ${session?.accessToken}` },
       });
-      if (response.status != 200)
-        handleDisconnect()
+      if (response.status != 200) handleDisconnect();
       const data = await response.json();
       setRepositories(data);
     } catch (error) {
@@ -45,6 +46,7 @@ const Dashboard = () => {
   const fetchBranches = async (repoObj: { html_url: any; }) => {
     try {
       const { owner, repo } = parseRepoUrl(repoObj.html_url);
+      setOwner(owner)
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches`, {
         headers: { Authorization: `token ${session?.accessToken}` },
       });
@@ -85,6 +87,25 @@ const Dashboard = () => {
     }
 
     setScraping(false);
+  };
+
+  // Handle embedding content
+  const handleCreateEmbeddings = async () => {
+    setEmbedding(true);
+
+    const response = await fetch('/api/create-embeddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: scrapedContent, provider: "github", namespace:`${owner}/${selectedRepo}/${selectedBranch}` }),
+    });
+
+    if (response.ok) {
+      console.log("Embeddings created and stored in Pinecone");
+    } else {
+      console.error("Error creating embeddings");
+    }
+
+    setEmbedding(false);
   };
 
   // Handle pagination
@@ -129,33 +150,16 @@ const Dashboard = () => {
 
         {/* Access Token */}
         <div className="mb-6">
-  <label className="block text-lg font-semibold text-gray-800">Access Token</label>
-  <div className="relative mt-2">
-    <input
-      type="text"
-      value={session?.accessToken || ""}
-      disabled
-      className="block w-full pl-4 pr-12 py-3 rounded-lg bg-gray-100 border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300 ease-in-out sm:text-base"
-    />
-    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-      <svg
-        className="w-6 h-6 text-gray-400"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          // d="M13 16h-1v-4h-1m1-4h.01M12 18.01h.01M12 9.01h.01M12 6.01h.01M12 2.01h.01M12 22.01h.01M2 6h2m-2 4h2M2 10h2m0 4h2m-2 4h2"
-        ></path>
-      </svg>
-    </div>
-  </div>
-</div>
-
+          <label className="block text-lg font-semibold text-gray-800">Access Token</label>
+          <div className="relative mt-2">
+            <input
+              type="text"
+              value={session?.accessToken || ""}
+              disabled
+              className="block w-full pl-4 pr-12 py-3 rounded-lg bg-gray-100 border border-gray-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-300 ease-in-out sm:text-base"
+            />
+          </div>
+        </div>
 
         {/* Repositories List */}
         <div className="mb-6">
@@ -193,7 +197,6 @@ const Dashboard = () => {
           </ul>
         </div>
 
-
         {/* Pagination */}
         <div className="flex justify-between items-center mb-6">
           <button
@@ -216,7 +219,6 @@ const Dashboard = () => {
           </button>
         </div>
 
-
         {/* Branch Selection */}
         {selectedRepo && (
           <div className="mb-6">
@@ -237,7 +239,6 @@ const Dashboard = () => {
             </select>
           </div>
         )}
-
       </div>
 
       <div className="w-2/3 p-6 bg-gray-200">
@@ -267,6 +268,17 @@ const Dashboard = () => {
               <div className="mt-6 p-4 bg-white rounded-md shadow">
                 <h3 className="text-lg font-bold">Scraped Content</h3>
                 <pre className="whitespace-pre-wrap break-words">{scrapedContent}</pre>
+
+                {/* Create Embeddings Button */}
+                <button
+                  onClick={handleCreateEmbeddings}
+                  className={`mt-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition ${
+                    embedding ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  disabled={embedding}
+                >
+                  {embedding ? "Creating Embeddings..." : "Create Embeddings"}
+                </button>
               </div>
             )}
           </div>
