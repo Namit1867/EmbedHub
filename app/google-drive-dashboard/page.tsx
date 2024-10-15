@@ -3,29 +3,30 @@
 import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import JSZip from "jszip";
 import { FaFolder, FaFileAlt, FaFileWord, FaFilePdf, FaFilePowerpoint, FaFileImage, FaFileVideo } from "react-icons/fa";
 
 const GoogleDriveDashboard = () => {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [files, setFiles] = useState([]);
-  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [nextPageToken, setNextPageToken] = useState(null);
+  const [previousPageTokens, setPreviousPageTokens] = useState([]); // Track previous tokens for pagination
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [folderStack, setFolderStack] = useState([]); // Tracks folder navigation
+  const [folderStack, setFolderStack] = useState([]); // Track folder navigation
   const [currentFolder, setCurrentFolder] = useState("root");
 
   // Fetch Google Drive files from backend API
-  const fetchDriveFiles = async (folderId = "root") => {
+  const fetchDriveFiles = async (folderId = "root", pageToken = "") => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/drive?token=${session?.accessToken}&folderId=${folderId}`, {
+      const response = await fetch(`/api/drive?token=${session?.accessToken}&folderId=${folderId}&pageToken=${pageToken}`, {
         method: "GET",
       });
       if (response.status !== 200) handleDisconnect();
       const data = await response.json();
       setFiles(data.files);
+      setNextPageToken(data.nextPageToken || null);
       setCurrentFolder(folderId);
     } catch (error) {
       console.error("Error fetching Google Drive files", error);
@@ -33,11 +34,13 @@ const GoogleDriveDashboard = () => {
     setLoading(false);
   };
 
-  // Handle folder navigation
+  // Handle folder navigation (double-click to open folders)
   const handleFolderOpen = (folderId, folderName) => {
     setFolderStack([...folderStack, { id: folderId, name: folderName }]);
+    setSearchQuery("");  // Clear the search query when a folder is opened
     fetchDriveFiles(folderId);
   };
+
 
   // Handle going back to previous folder
   const handleGoBack = () => {
@@ -46,16 +49,31 @@ const GoogleDriveDashboard = () => {
     fetchDriveFiles(newStack.length ? newStack[newStack.length - 1].id : "root");
   };
 
-  // Handle file selection
-  const handleFileSelect = (fileId) => {
-    if (selectedFiles.includes(fileId)) {
-      setSelectedFiles(selectedFiles.filter((id) => id !== fileId));
-    } else {
-      setSelectedFiles([...selectedFiles, fileId]);
+  // Handle pagination (Next)
+  const handleNextPage = () => {
+    if (nextPageToken) {
+      setPreviousPageTokens([...previousPageTokens, nextPageToken]);
+      fetchDriveFiles(currentFolder, nextPageToken);
     }
   };
 
-  // Fetch Google Drive files when user is authenticated
+  // Handle pagination (Previous)
+  const handlePreviousPage = () => {
+    if (previousPageTokens.length > 0) {
+      const newTokens = previousPageTokens.slice(0, -1);
+      setPreviousPageTokens(newTokens);
+      const lastToken = newTokens[newTokens.length - 1] || "";
+      fetchDriveFiles(currentFolder, lastToken);
+    }
+  };
+
+  // Handle file selection (on single click)
+  const handleFileSelect = (fileId) => {
+    // You can add a file selection logic here
+    console.log("File selected:", fileId);
+  };
+
+  // Fetch Google Drive files when the user is authenticated
   useEffect(() => {
     if (status === "authenticated") {
       fetchDriveFiles();
@@ -64,6 +82,7 @@ const GoogleDriveDashboard = () => {
     }
   }, [status]);
 
+  // Handle logout
   const handleDisconnect = async () => {
     await signOut({ redirect: false });
     localStorage.removeItem("session");
@@ -75,8 +94,8 @@ const GoogleDriveDashboard = () => {
     file.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Define icon types based on MIME types or file extensions
-  const getFileIcon = (mimeType, fileName) => {
+  // Define file icons based on MIME types or file extensions
+  const getFileIcon = (mimeType) => {
     if (mimeType === "application/vnd.google-apps.folder") {
       return <FaFolder className="text-yellow-500" />;
     } else if (mimeType.includes("application/pdf")) {
@@ -95,7 +114,7 @@ const GoogleDriveDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
       {/* Disconnect Button */}
       <div className="absolute top-4 right-4">
         <button
@@ -107,36 +126,17 @@ const GoogleDriveDashboard = () => {
       </div>
 
       {/* Google Drive File Picker */}
-      <div className="w-3/4 bg-white rounded-lg shadow-lg p-6">
-        <div className="flex items-center space-x-4 mb-4">
-          <h2 className="text-xl font-bold">Google Drive</h2>
+      <div className="w-full max-w-5xl bg-white rounded-lg shadow-lg p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-gray-700">Google Drive</h2>
 
-          {/* Display folder path */}
-          <div className="text-gray-600">
-            {folderStack.length > 0 ? (
-              <>
-                Google Drive &gt;
-                {folderStack.map((folder, index) => (
-                  <span key={folder.id}>
-                    {index > 0 && " > "}
-                    {folder.name}
-                  </span>
-                ))}
-              </>
-            ) : (
-              "Google Drive"
-            )}
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="mb-4">
+          {/* Search Bar */}
           <input
             type="text"
             placeholder="Search files..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
@@ -147,7 +147,6 @@ const GoogleDriveDashboard = () => {
               <tr className="bg-gray-200">
                 <th className="px-4 py-2 text-left font-medium text-gray-600">Icon</th>
                 <th className="px-4 py-2 text-left font-medium text-gray-600">Name</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-600">Owner</th>
                 <th className="px-4 py-2 text-left font-medium text-gray-600">Last Modified</th>
               </tr>
             </thead>
@@ -155,29 +154,45 @@ const GoogleDriveDashboard = () => {
               {filteredFiles.map((file) => (
                 <tr
                   key={file.id}
-                  className={`cursor-pointer transition hover:bg-gray-100 ${selectedFiles.includes(file.id)
-                      ? "bg-blue-50 border-l-4 border-blue-500"
-                      : ""
-                    }`}
+                  className="cursor-pointer transition hover:bg-gray-100"
                   onDoubleClick={() =>
                     file.mimeType === "application/vnd.google-apps.folder"
                       ? handleFolderOpen(file.id, file.name)
                       : handleFileSelect(file.id)
                   }
-                  onClick={() => handleFileSelect(file.id)} // Single click will still select the file
                 >
-                  <td className="px-4 py-2">{getFileIcon(file.mimeType, file.name)}</td>
+                  <td className="px-4 py-2">{getFileIcon(file.mimeType)}</td>
                   <td className="px-4 py-2">{file.name}</td>
-                  <td className="px-4 py-2">me</td>
                   <td className="px-4 py-2">{new Date(file.modifiedTime).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
-
           </table>
         </div>
 
-        {/* Back Button */}
+        {/* Pagination Controls */}
+        <div className="flex justify-between mt-4">
+          <button
+            onClick={handlePreviousPage}
+            disabled={previousPageTokens.length === 0}
+            className={`px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition ${
+              previousPageTokens.length === 0 ? "cursor-not-allowed opacity-50" : ""
+            }`}
+          >
+            Previous
+          </button>
+          <button
+            onClick={handleNextPage}
+            disabled={!nextPageToken}
+            className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${
+              !nextPageToken ? "cursor-not-allowed opacity-50" : ""
+            }`}
+          >
+            Next
+          </button>
+        </div>
+
+        {/* Back Button (for folder navigation) */}
         {folderStack.length > 0 && (
           <div className="mt-4">
             <button
