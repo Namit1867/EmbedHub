@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import JSZip from "jszip";
-import { FaFolder, FaFileAlt } from "react-icons/fa";
+import { FaFolder, FaFileAlt, FaFileWord, FaFilePdf, FaFilePowerpoint, FaFileImage, FaFileVideo } from "react-icons/fa";
 
 const GoogleDriveDashboard = () => {
   const { data: session, status } = useSession();
@@ -75,9 +75,20 @@ const GoogleDriveDashboard = () => {
     file.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getFileIcon = (mimeType) => {
+  // Define icon types based on MIME types or file extensions
+  const getFileIcon = (mimeType, fileName) => {
     if (mimeType === "application/vnd.google-apps.folder") {
       return <FaFolder className="text-yellow-500" />;
+    } else if (mimeType.includes("application/pdf")) {
+      return <FaFilePdf className="text-red-500" />;
+    } else if (mimeType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document") || mimeType.includes(".doc")) {
+      return <FaFileWord className="text-blue-500" />;
+    } else if (mimeType.includes("application/vnd.openxmlformats-officedocument.presentationml.presentation") || mimeType.includes(".ppt")) {
+      return <FaFilePowerpoint className="text-orange-500" />;
+    } else if (mimeType.includes("image/")) {
+      return <FaFileImage className="text-green-500" />;
+    } else if (mimeType.includes("video/")) {
+      return <FaFileVideo className="text-purple-500" />;
     } else {
       return <FaFileAlt className="text-gray-500" />;
     }
@@ -144,24 +155,25 @@ const GoogleDriveDashboard = () => {
               {filteredFiles.map((file) => (
                 <tr
                   key={file.id}
-                  className={`cursor-pointer transition hover:bg-gray-100 ${
-                    selectedFiles.includes(file.id)
+                  className={`cursor-pointer transition hover:bg-gray-100 ${selectedFiles.includes(file.id)
                       ? "bg-blue-50 border-l-4 border-blue-500"
                       : ""
-                  }`}
-                  onClick={() =>
+                    }`}
+                  onDoubleClick={() =>
                     file.mimeType === "application/vnd.google-apps.folder"
                       ? handleFolderOpen(file.id, file.name)
                       : handleFileSelect(file.id)
                   }
+                  onClick={() => handleFileSelect(file.id)} // Single click will still select the file
                 >
-                  <td className="px-4 py-2">{getFileIcon(file.mimeType)}</td>
+                  <td className="px-4 py-2">{getFileIcon(file.mimeType, file.name)}</td>
                   <td className="px-4 py-2">{file.name}</td>
                   <td className="px-4 py-2">me</td>
                   <td className="px-4 py-2">{new Date(file.modifiedTime).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
+
           </table>
         </div>
 
