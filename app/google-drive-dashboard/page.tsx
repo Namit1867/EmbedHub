@@ -11,14 +11,22 @@ const GoogleDriveDashboard = () => {
   const [files, setFiles] = useState([]);
   const [nextPageToken, setNextPageToken] = useState(null);
   const [previousPageTokens, setPreviousPageTokens] = useState([]); // Track previous tokens for pagination
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Loader state
   const [searchQuery, setSearchQuery] = useState("");
   const [folderStack, setFolderStack] = useState([]); // Track folder navigation
   const [currentFolder, setCurrentFolder] = useState("root");
 
+  const Loader = () => (
+    <div className="flex justify-center items-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid border-gray-200"></div>
+    </div>
+  );
+  
+  
+
   // Fetch Google Drive files from backend API
   const fetchDriveFiles = async (folderId = "root", pageToken = "") => {
-    setLoading(true);
+    setLoading(true); // Set loader to true before fetching
     try {
       const response = await fetch(`/api/drive?token=${session?.accessToken}&folderId=${folderId}&pageToken=${pageToken}`, {
         method: "GET",
@@ -31,7 +39,7 @@ const GoogleDriveDashboard = () => {
     } catch (error) {
       console.error("Error fetching Google Drive files", error);
     }
-    setLoading(false);
+    setLoading(false); // Set loader to false after fetching
   };
 
   // Handle folder navigation (double-click to open folders)
@@ -40,7 +48,6 @@ const GoogleDriveDashboard = () => {
     setSearchQuery("");  // Clear the search query when a folder is opened
     fetchDriveFiles(folderId);
   };
-
 
   // Handle going back to previous folder
   const handleGoBack = () => {
@@ -65,12 +72,6 @@ const GoogleDriveDashboard = () => {
       const lastToken = newTokens[newTokens.length - 1] || "";
       fetchDriveFiles(currentFolder, lastToken);
     }
-  };
-
-  // Handle file selection (on single click)
-  const handleFileSelect = (fileId) => {
-    // You can add a file selection logic here
-    console.log("File selected:", fileId);
   };
 
   // Fetch Google Drive files when the user is authenticated
@@ -140,52 +141,57 @@ const GoogleDriveDashboard = () => {
           />
         </div>
 
+        {/* Loader */}
+        {loading && <Loader />}
+
         {/* File List Table */}
         <div className="overflow-auto max-h-96">
-          <table className="min-w-full table-auto">
-            <thead>
-              <tr className="bg-gray-200">
-                <th className="px-4 py-2 text-left font-medium text-gray-600">Icon</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-600">Name</th>
-                <th className="px-4 py-2 text-left font-medium text-gray-600">Last Modified</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredFiles.map((file) => (
-                <tr
-                  key={file.id}
-                  className="cursor-pointer transition hover:bg-gray-100"
-                  onDoubleClick={() =>
-                    file.mimeType === "application/vnd.google-apps.folder"
-                      ? handleFolderOpen(file.id, file.name)
-                      : handleFileSelect(file.id)
-                  }
-                >
-                  <td className="px-4 py-2">{getFileIcon(file.mimeType)}</td>
-                  <td className="px-4 py-2">{file.name}</td>
-                  <td className="px-4 py-2">{new Date(file.modifiedTime).toLocaleDateString()}</td>
+          {!loading && (
+            <table className="min-w-full table-auto">
+              <thead>
+                <tr className="bg-gray-200">
+                  <th className="px-4 py-2 text-left font-medium text-gray-600">Icon</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600">Name</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600">Last Modified</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredFiles.map((file) => (
+                  <tr
+                    key={file.id}
+                    className="cursor-pointer transition hover:bg-gray-100"
+                    onDoubleClick={() =>
+                      file.mimeType === "application/vnd.google-apps.folder"
+                        ? handleFolderOpen(file.id, file.name)
+                        : handleFileSelect(file.id)
+                    }
+                  >
+                    <td className="px-4 py-2">{getFileIcon(file.mimeType)}</td>
+                    <td className="px-4 py-2">{file.name}</td>
+                    <td className="px-4 py-2">{new Date(file.modifiedTime).toLocaleDateString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Pagination Controls */}
         <div className="flex justify-between mt-4">
           <button
             onClick={handlePreviousPage}
-            disabled={previousPageTokens.length === 0}
+            disabled={previousPageTokens.length === 0 || loading} // Disable when loading
             className={`px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition ${
-              previousPageTokens.length === 0 ? "cursor-not-allowed opacity-50" : ""
+              previousPageTokens.length === 0 || loading ? "cursor-not-allowed opacity-50" : ""
             }`}
           >
             Previous
           </button>
           <button
             onClick={handleNextPage}
-            disabled={!nextPageToken}
+            disabled={!nextPageToken || loading} // Disable when loading
             className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${
-              !nextPageToken ? "cursor-not-allowed opacity-50" : ""
+              !nextPageToken || loading ? "cursor-not-allowed opacity-50" : ""
             }`}
           >
             Next
@@ -198,6 +204,7 @@ const GoogleDriveDashboard = () => {
             <button
               onClick={handleGoBack}
               className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
+              disabled={loading} // Disable when loading
             >
               Back
             </button>
