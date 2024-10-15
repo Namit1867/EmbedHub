@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { FaFolder, FaFileAlt, FaFileWord, FaFilePdf, FaFilePowerpoint, FaFileImage, FaFileVideo } from "react-icons/fa";
+import { FaFolder, FaFileAlt, FaFileWord, FaFilePdf, FaFilePowerpoint, FaFileImage, FaFileVideo, FaTrash } from "react-icons/fa";
 
 const GoogleDriveDashboard = () => {
   const { data: session, status } = useSession();
@@ -15,14 +15,7 @@ const GoogleDriveDashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [folderStack, setFolderStack] = useState([]); // Track folder navigation
   const [currentFolder, setCurrentFolder] = useState("root");
-
-  const Loader = () => (
-    <div className="flex justify-center items-center">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid border-gray-200"></div>
-    </div>
-  );
-  
-  
+  const [selectedFiles, setSelectedFiles] = useState([]); // Track selected files
 
   // Fetch Google Drive files from backend API
   const fetchDriveFiles = async (folderId = "root", pageToken = "") => {
@@ -47,6 +40,30 @@ const GoogleDriveDashboard = () => {
     setFolderStack([...folderStack, { id: folderId, name: folderName }]);
     setSearchQuery("");  // Clear the search query when a folder is opened
     fetchDriveFiles(folderId);
+  };
+
+  // Handle file selection (single click to select/deselect files)
+  const handleFileSelect = (file) => {
+    // Check if the file is a folder by checking its MIME type
+    if (file.mimeType === "application/vnd.google-apps.folder") {
+      return; // Do not select folders
+    }
+
+    const alreadySelected = selectedFiles.find((selectedFile) => selectedFile.id === file.id);
+
+    if (alreadySelected) {
+      // Remove from selected files if already selected
+      setSelectedFiles(selectedFiles.filter((selectedFile) => selectedFile.id !== file.id));
+    } else {
+      // Add to selected files
+      setSelectedFiles([...selectedFiles, file]);
+    }
+  };
+
+
+  // Handle removing a file from the selected list
+  const handleRemoveFile = (fileId) => {
+    setSelectedFiles(selectedFiles.filter((file) => file.id !== fileId));
   };
 
   // Handle going back to previous folder
@@ -142,7 +159,11 @@ const GoogleDriveDashboard = () => {
         </div>
 
         {/* Loader */}
-        {loading && <Loader />}
+        {loading && (
+          <div className="flex justify-center items-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid border-gray-200"></div>
+          </div>
+        )}
 
         {/* File List Table */}
         <div className="overflow-auto max-h-96">
@@ -159,11 +180,13 @@ const GoogleDriveDashboard = () => {
                 {filteredFiles.map((file) => (
                   <tr
                     key={file.id}
-                    className="cursor-pointer transition hover:bg-gray-100"
+                    className={`cursor-pointer transition hover:bg-gray-100 ${selectedFiles.find((selectedFile) => selectedFile.id === file.id) ? "bg-blue-50" : ""
+                      }`}
+                    onClick={() => handleFileSelect(file)}
                     onDoubleClick={() =>
                       file.mimeType === "application/vnd.google-apps.folder"
                         ? handleFolderOpen(file.id, file.name)
-                        : handleFileSelect(file.id)
+                        : null
                     }
                   >
                     <td className="px-4 py-2">{getFileIcon(file.mimeType)}</td>
@@ -176,23 +199,39 @@ const GoogleDriveDashboard = () => {
           )}
         </div>
 
+        {/* Selected Files Section */}
+        {selectedFiles.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-xl font-bold text-gray-700">Selected Files</h3>
+            <div className="flex flex-wrap mt-4">
+              {selectedFiles.map((file) => (
+                <div key={file.id} className="flex items-center bg-gray-200 px-4 py-2 rounded-lg mr-2 mb-2">
+                  <span className="mr-2">{file.name}</span>
+                  <FaTrash
+                    className="text-red-500 cursor-pointer hover:text-red-700"
+                    onClick={() => handleRemoveFile(file.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Pagination Controls */}
         <div className="flex justify-between mt-4">
           <button
             onClick={handlePreviousPage}
             disabled={previousPageTokens.length === 0 || loading} // Disable when loading
-            className={`px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition ${
-              previousPageTokens.length === 0 || loading ? "cursor-not-allowed opacity-50" : ""
-            }`}
+            className={`px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition ${previousPageTokens.length === 0 || loading ? "cursor-not-allowed opacity-50" : ""
+              }`}
           >
             Previous
           </button>
           <button
             onClick={handleNextPage}
             disabled={!nextPageToken || loading} // Disable when loading
-            className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${
-              !nextPageToken || loading ? "cursor-not-allowed opacity-50" : ""
-            }`}
+            className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${!nextPageToken || loading ? "cursor-not-allowed opacity-50" : ""
+              }`}
           >
             Next
           </button>
