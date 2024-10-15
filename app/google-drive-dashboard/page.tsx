@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import JSZip from "jszip";
+import { FaFolder, FaFileAlt } from "react-icons/fa";
 
 const GoogleDriveDashboard = () => {
   const { data: session, status } = useSession();
@@ -11,58 +12,47 @@ const GoogleDriveDashboard = () => {
   const [files, setFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [folderStack, setFolderStack] = useState([]); // Tracks folder navigation
+  const [currentFolder, setCurrentFolder] = useState("root");
 
   // Fetch Google Drive files from backend API
-  const fetchDriveFiles = async () => {
+  const fetchDriveFiles = async (folderId = "root") => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/drive?token=${session?.accessToken}`, {
-        method: "GET"
+      const response = await fetch(`/api/drive?token=${session?.accessToken}&folderId=${folderId}`, {
+        method: "GET",
       });
       if (response.status !== 200) handleDisconnect();
       const data = await response.json();
       setFiles(data.files);
+      setCurrentFolder(folderId);
     } catch (error) {
       console.error("Error fetching Google Drive files", error);
     }
     setLoading(false);
   };
 
-  // Handle file selection (multiple select)
+  // Handle folder navigation
+  const handleFolderOpen = (folderId, folderName) => {
+    setFolderStack([...folderStack, { id: folderId, name: folderName }]);
+    fetchDriveFiles(folderId);
+  };
+
+  // Handle going back to previous folder
+  const handleGoBack = () => {
+    const newStack = folderStack.slice(0, -1);
+    setFolderStack(newStack);
+    fetchDriveFiles(newStack.length ? newStack[newStack.length - 1].id : "root");
+  };
+
+  // Handle file selection
   const handleFileSelect = (fileId) => {
     if (selectedFiles.includes(fileId)) {
       setSelectedFiles(selectedFiles.filter((id) => id !== fileId));
     } else {
       setSelectedFiles([...selectedFiles, fileId]);
     }
-  };
-
-  // Handle file download (ZIP selected files)
-  const handleDownload = async () => {
-    setDownloading(true);
-    try {
-      const response = await fetch("/api/drive/download", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ fileIds: selectedFiles, token: session.accessToken }),
-      });
-      const zipBlob = await response.blob();
-
-      // Create a download link for the zip file
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(zipBlob);
-      link.setAttribute("download", "google_drive_files.zip");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error("Error downloading files", error);
-    }
-    setDownloading(false);
   };
 
   // Fetch Google Drive files when user is authenticated
@@ -85,7 +75,13 @@ const GoogleDriveDashboard = () => {
     file.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (loading) return <div>Loading files from Google Drive...</div>;
+  const getFileIcon = (mimeType) => {
+    if (mimeType === "application/vnd.google-apps.folder") {
+      return <FaFolder className="text-yellow-500" />;
+    } else {
+      return <FaFileAlt className="text-gray-500" />;
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center">
@@ -101,7 +97,26 @@ const GoogleDriveDashboard = () => {
 
       {/* Google Drive File Picker */}
       <div className="w-3/4 bg-white rounded-lg shadow-lg p-6">
-        <h2 className="text-xl font-bold mb-4">Select a file</h2>
+        <div className="flex items-center space-x-4 mb-4">
+          <h2 className="text-xl font-bold">Google Drive</h2>
+
+          {/* Display folder path */}
+          <div className="text-gray-600">
+            {folderStack.length > 0 ? (
+              <>
+                Google Drive &gt;
+                {folderStack.map((folder, index) => (
+                  <span key={folder.id}>
+                    {index > 0 && " > "}
+                    {folder.name}
+                  </span>
+                ))}
+              </>
+            ) : (
+              "Google Drive"
+            )}
+          </div>
+        </div>
 
         {/* Search Bar */}
         <div className="mb-4">
@@ -119,6 +134,7 @@ const GoogleDriveDashboard = () => {
           <table className="min-w-full table-auto">
             <thead>
               <tr className="bg-gray-200">
+                <th className="px-4 py-2 text-left font-medium text-gray-600">Icon</th>
                 <th className="px-4 py-2 text-left font-medium text-gray-600">Name</th>
                 <th className="px-4 py-2 text-left font-medium text-gray-600">Owner</th>
                 <th className="px-4 py-2 text-left font-medium text-gray-600">Last Modified</th>
@@ -133,35 +149,33 @@ const GoogleDriveDashboard = () => {
                       ? "bg-blue-50 border-l-4 border-blue-500"
                       : ""
                   }`}
-                  onClick={() => handleFileSelect(file.id)}
+                  onClick={() =>
+                    file.mimeType === "application/vnd.google-apps.folder"
+                      ? handleFolderOpen(file.id, file.name)
+                      : handleFileSelect(file.id)
+                  }
                 >
+                  <td className="px-4 py-2">{getFileIcon(file.mimeType)}</td>
                   <td className="px-4 py-2">{file.name}</td>
                   <td className="px-4 py-2">me</td>
-                  <td className="px-4 py-2">{new Date().toLocaleDateString()}</td>
+                  <td className="px-4 py-2">{new Date(file.modifiedTime).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* Select and Cancel Buttons */}
-        <div className="flex justify-end space-x-4 mt-4">
-          <button
-            onClick={handleDownload}
-            className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${
-              downloading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-            disabled={downloading || selectedFiles.length === 0}
-          >
-            {downloading ? "Downloading..." : "Select"}
-          </button>
-          <button
-            onClick={() => setSelectedFiles([])}
-            className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
-          >
-            Cancel
-          </button>
-        </div>
+        {/* Back Button */}
+        {folderStack.length > 0 && (
+          <div className="mt-4">
+            <button
+              onClick={handleGoBack}
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition"
+            >
+              Back
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

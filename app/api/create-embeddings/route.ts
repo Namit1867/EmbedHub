@@ -68,7 +68,6 @@ export async function POST(request) {
 
     // Upsert the vectors and metadata into the Pinecone index
     const pinecone_index_instance = pinecone.Index(pinecone_index);
-    console.log("upsertVectors", upsertVectors)
 
     const res = await pinecone_index_instance.namespace(namespace).upsert(
       [
