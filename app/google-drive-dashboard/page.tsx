@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { FaFolder, FaFileAlt, FaFileWord, FaFilePdf, FaFilePowerpoint, FaFileImage, FaFileVideo, FaTrash } from "react-icons/fa";
+import { FaFolder, FaFileAlt, FaFileWord, FaFileCsv, FaFilePdf, FaFilePowerpoint, FaFileImage, FaFileVideo, FaTrash } from "react-icons/fa";
 
 const GoogleDriveDashboard = () => {
   const { data: session, status } = useSession();
@@ -48,6 +48,19 @@ const GoogleDriveDashboard = () => {
     if (file.mimeType === "application/vnd.google-apps.folder") {
       return; // Do not select folders
     }
+    else if (file.mimeType.includes("image/")){
+      return; // Do not select images
+    }
+    else if (file.mimeType.includes("video/")){
+      return; // Do not select videos
+    }
+    else if (file.mimeType.includes("application/pdf")){
+      return; // Do not select pdf files
+    }
+    else if (file.mimeType.includes("application/vnd.openxmlformats-officedocument.presentationml.presentation")){
+      return; // Do not select powerpoint files
+    }
+
 
     const alreadySelected = selectedFiles.find((selectedFile) => selectedFile.id === file.id);
 
@@ -118,11 +131,14 @@ const GoogleDriveDashboard = () => {
       return <FaFolder className="text-yellow-500" />;
     } else if (mimeType.includes("application/pdf")) {
       return <FaFilePdf className="text-red-500" />;
-    } else if (mimeType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document") || mimeType.includes(".doc")) {
+    } else if (mimeType.includes("adocument") || mimeType.includes(".doc")) {
       return <FaFileWord className="text-blue-500" />;
-    } else if (mimeType.includes("application/vnd.openxmlformats-officedocument.presentationml.presentation") || mimeType.includes(".ppt")) {
+    } else if (mimeType.includes("spreadsheet") || mimeType.includes(".csv")) {
+      return <FaFileCsv className="text-green-500" />;
+    } else if (mimeType.includes("presentation") || mimeType.includes(".pptx")) {
       return <FaFilePowerpoint className="text-orange-500" />;
-    } else if (mimeType.includes("image/")) {
+    }
+    else if (mimeType.includes("image/")) {
       return <FaFileImage className="text-green-500" />;
     } else if (mimeType.includes("video/")) {
       return <FaFileVideo className="text-purple-500" />;
@@ -130,6 +146,28 @@ const GoogleDriveDashboard = () => {
       return <FaFileAlt className="text-gray-500" />;
     }
   };
+
+  const scrapeTextFromSelectedFiles = async () => {
+
+    console.log("Selected Files:", selectedFiles)
+    const fileIds = selectedFiles.map((file) => file.id);
+  
+    const response = await fetch('/api/scrape-google-drive-file', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ fileIds, token: session?.accessToken }),
+    });
+  
+    if (response.ok) {
+      const data = await response.json();
+      console.log('Scraped Text Data:', data.files);
+    } else {
+      console.error('Error scraping text data');
+    }
+  };
+  
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
@@ -250,6 +288,18 @@ const GoogleDriveDashboard = () => {
           </div>
         )}
       </div>
+
+        {/* Disconnect Button */}
+      {(!!selectedFiles && selectedFiles.length > 0) &&
+      (      <div className="absolute bottom-4 right-4">
+        <button
+          onClick={scrapeTextFromSelectedFiles}
+          className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition"
+        >
+          Scrape Content
+        </button>
+      </div>)
+      }
     </div>
   );
 };
