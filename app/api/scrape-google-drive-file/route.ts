@@ -49,7 +49,7 @@ export async function POST(req) {
         }
 
         const fileContent = await exportResponse.text();
-        fileContents.push({ fileId, name: metadata.name, content: fileContent });
+        fileContents.push({ fileId, name: metadata.name, content: fileContent, mimeType: metadata.mimeType });
       } else {
         // Handle binary files (e.g., PDFs, text files)
         const binaryResponse = await fetch(
@@ -66,7 +66,7 @@ export async function POST(req) {
         }
 
         const fileContent = await binaryResponse.text();
-        fileContents.push({ fileId, name: metadata.name, content: fileContent });
+        fileContents.push({ fileId, name: metadata.name, content: fileContent, mimeType: metadata.mimeType });
       }
     } catch (error) {
       console.error(`Error scraping file ${fileId}:`, error.message);
