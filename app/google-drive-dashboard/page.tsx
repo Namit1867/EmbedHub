@@ -369,17 +369,16 @@ const scrapeTextFromSelectedFiles = async () => {
         </div>
         {/* Increased height for the text area and scrollable */}
         <div className="bg-white p-4 border rounded-lg max-h-96 overflow-auto">
-  <textarea
-    className="w-full h-64 border-none focus:outline-none" // Increased height to h-64 (you can adjust this)
-    value={file.content}
-    onChange={(e) => {
-      const newContent = [...scrapedContent];
-      newContent[index].content = e.target.value;
-      setScrapedContent(newContent);
-    }}
-  />
-</div>
-
+          <textarea
+            className="w-full h-64 border-none focus:outline-none"
+            value={file.content}
+            onChange={(e) => {
+              const newContent = [...scrapedContent];
+              newContent[index].content = e.target.value;
+              setScrapedContent(newContent);
+            }}
+          />
+        </div>
         <button className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
           Create Embeddings
         </button>
