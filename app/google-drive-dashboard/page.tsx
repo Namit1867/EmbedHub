@@ -95,13 +95,13 @@ const GoogleDriveDashboard = () => {
     // Filter out the file with the matching fileId from the scrapedContent array
     setSelectedFiles(selectedFiles.filter((file) => file.id !== fileId));
   };
-  
+
   // Handle removing a file from the selected list
   const handleRemoveScrapedFile = (fileId) => {
     // Filter out the file with the matching fileId from the scrapedContent array
     setScrapedContent(scrapedContent.filter((file) => file.fileId !== fileId));
   };
-  
+
 
   // Handle going back to previous folder
   const handleGoBack = () => {
@@ -146,33 +146,33 @@ const GoogleDriveDashboard = () => {
     router.push("/");
   };
 
-// Function to scrape content from selected files
-const scrapeTextFromSelectedFiles = async () => {
-  setScrapeButtonLoading(true); // Start loader for the Scrape button
-  setScrapingLoader(true); // Start loader for the scraping process
+  // Function to scrape content from selected files
+  const scrapeTextFromSelectedFiles = async () => {
+    setScrapeButtonLoading(true); // Start loader for the Scrape button
+    setScrapingLoader(true); // Start loader for the scraping process
 
-  const fileIds = selectedFiles.map((file) => file.id);
+    const fileIds = selectedFiles.map((file) => file.id);
 
-  const response = await fetch("/api/scrape-google-drive-file", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ fileIds, token: session?.accessToken }),
-  });
+    const response = await fetch("/api/scrape-google-drive-file", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fileIds, token: session?.accessToken }),
+    });
 
-  if (response.ok) {
-    const data = await response.json();
-    setScrapedContent((prevContent) => [...prevContent, ...data.files]);
-    setShowScrapedContent(true); // Show the scraped content panel
-    setSelectedFiles([]); // Clear selected files
-  } else {
-    console.error("Error scraping text data");
-  }
+    if (response.ok) {
+      const data = await response.json();
+      setScrapedContent((prevContent) => [...prevContent, ...data.files]);
+      setShowScrapedContent(true); // Show the scraped content panel
+      setSelectedFiles([]); // Clear selected files
+    } else {
+      console.error("Error scraping text data");
+    }
 
-  setScrapingLoader(false); // Stop loader for the scraping process
-  setScrapeButtonLoading(false); // Stop loader for the Scrape button
-};
+    setScrapingLoader(false); // Stop loader for the scraping process
+    setScrapeButtonLoading(false); // Stop loader for the Scrape button
+  };
 
   // Search files by name
   const filteredFiles = files.filter((file) =>
@@ -211,22 +211,34 @@ const scrapeTextFromSelectedFiles = async () => {
     <div className="min-h-screen flex">
       {/* Google Drive File Picker (Left Side) */}
       <div
-        className={`bg-white p-6 shadow-lg transition-all duration-500 ease-in-out ${
-          showScrapedContent ? "w-2/3" : "w-full"
-        }`}
+        className={`bg-white p-6 shadow-lg transition-all duration-500 ease-in-out ${showScrapedContent ? "w-2/3" : "w-full"
+          }`}
       >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-2xl font-bold text-gray-700">Google Drive</h2>
 
-          {/* Search Bar */}
-          <input
-            type="text"
-            placeholder="Search files..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
-          />
+          {/* Flex container for buttons */}
+          <div className="flex space-x-4">
+
+
+            {/* Search Bar */}
+            <input
+              type="text"
+              placeholder="Search files..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            />
+            {/* Disconnect Button */}
+            <button
+              onClick={handleDisconnect}
+              className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition"
+            >
+              Disconnect
+            </button>
+          </div>
         </div>
+
 
         {/* Loader */}
         {loading && (
@@ -256,13 +268,12 @@ const scrapeTextFromSelectedFiles = async () => {
                 {filteredFiles.map((file) => (
                   <tr
                     key={file.id}
-                    className={`cursor-pointer transition hover:bg-gray-100 ${
-                      selectedFiles.find(
-                        (selectedFile) => selectedFile.id === file.id
-                      )
+                    className={`cursor-pointer transition hover:bg-gray-100 ${selectedFiles.find(
+                      (selectedFile) => selectedFile.id === file.id
+                    )
                         ? "bg-blue-50"
                         : ""
-                    }`}
+                      }`}
                     onClick={() => handleFileSelect(file)}
                     onDoubleClick={() =>
                       file.mimeType === "application/vnd.google-apps.folder"
@@ -308,22 +319,20 @@ const scrapeTextFromSelectedFiles = async () => {
           <button
             onClick={handlePreviousPage}
             disabled={previousPageTokens.length === 0 || loading} // Disable when loading
-            className={`px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition ${
-              previousPageTokens.length === 0 || loading
+            className={`px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition ${previousPageTokens.length === 0 || loading
                 ? "cursor-not-allowed opacity-50"
                 : ""
-            }`}
+              }`}
           >
             Previous
           </button>
           <button
             onClick={handleNextPage}
             disabled={!nextPageToken || loading} // Disable when loading
-            className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${
-              !nextPageToken || loading
+            className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${!nextPageToken || loading
                 ? "cursor-not-allowed opacity-50"
                 : ""
-            }`}
+              }`}
           >
             Next
           </button>
@@ -344,76 +353,76 @@ const scrapeTextFromSelectedFiles = async () => {
       </div>
 
 
-{/* Scraped Content Panel (Right Side) */}
-{showScrapedContent && (
-  <div className="w-1/3 bg-gray-50 p-6 shadow-lg overflow-y-auto h-screen">
-    <h3 className="text-2xl font-bold text-gray-700 mb-4">
-      Scraped Content
-    </h3>
-    
-    {scrapedContent.map((file, index) => (
-      <div key={index} className="mb-6">
-        <div className="flex justify-between items-center mb-2">
-          {/* File Type Icon and File Name */}
-          <div className="flex items-center">
-            {getFileIcon(file.mimeType)} {/* Display File Type Icon */}
-            <h4 className="text-xl font-bold text-gray-600 ml-2">
-              {file.name}
-            </h4>
-          </div>
-          {/* Trash Can Icon to Remove Specific File */}
-          <FaTrash
-            className="text-red-500 cursor-pointer hover:text-red-700"
-            onClick={() => handleRemoveScrapedFile(file.fileId)} // Delete only the clicked file
-          />
-        </div>
-        {/* Increased height for the text area and scrollable */}
-        <div className="bg-white p-4 border rounded-lg max-h-96 overflow-auto">
-          <textarea
-            className="w-full h-64 border-none focus:outline-none"
-            value={file.content}
-            onChange={(e) => {
-              const newContent = [...scrapedContent];
-              newContent[index].content = e.target.value;
-              setScrapedContent(newContent);
-            }}
-          />
-        </div>
-        <button className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
-          Create Embeddings
-        </button>
-      </div>
-    ))}
+      {/* Scraped Content Panel (Right Side) */}
+      {showScrapedContent && (
+        <div className="w-1/3 bg-gray-50 p-6 shadow-lg overflow-y-auto h-screen">
+          <h3 className="text-2xl font-bold text-gray-700 mb-4">
+            Scraped Content
+          </h3>
 
-    {/* Loader below last file when new files are being selected */}
-    {scrapingLoader && (
-      <div className="flex justify-center mt-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-blue-500 border-solid"></div>
-        <span className="ml-2 text-gray-700">Scraping new content...</span>
-      </div>
-    )}
-  </div>
-)}
+          {scrapedContent.map((file, index) => (
+            <div key={index} className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                {/* File Type Icon and File Name */}
+                <div className="flex items-center">
+                  {getFileIcon(file.mimeType)} {/* Display File Type Icon */}
+                  <h4 className="text-xl font-bold text-gray-600 ml-2">
+                    {file.name}
+                  </h4>
+                </div>
+                {/* Trash Can Icon to Remove Specific File */}
+                <FaTrash
+                  className="text-red-500 cursor-pointer hover:text-red-700"
+                  onClick={() => handleRemoveScrapedFile(file.fileId)} // Delete only the clicked file
+                />
+              </div>
+              {/* Increased height for the text area and scrollable */}
+              <div className="bg-white p-4 border rounded-lg max-h-96 overflow-auto">
+                <textarea
+                  className="w-full h-64 border-none focus:outline-none"
+                  value={file.content}
+                  onChange={(e) => {
+                    const newContent = [...scrapedContent];
+                    newContent[index].content = e.target.value;
+                    setScrapedContent(newContent);
+                  }}
+                />
+              </div>
+              <button className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                Create Embeddings
+              </button>
+            </div>
+          ))}
+
+          {/* Loader below last file when new files are being selected */}
+          {scrapingLoader && (
+            <div className="flex justify-center mt-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-blue-500 border-solid"></div>
+              <span className="ml-2 text-gray-700">Scraping new content...</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Scrape Button */}
       {!!selectedFiles.length && (
-  <div className="absolute bottom-4 right-4">
-    <button
-      onClick={scrapeTextFromSelectedFiles}
-      disabled={scrapeButtonLoading} // Disable button while loading
-      className={`px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition ${scrapeButtonLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-    >
-      {scrapeButtonLoading ? (
-        <div className="flex items-center">
-          <div className="animate-spin rounded-full h-5 w-5 border-t-4 border-white border-solid mr-2"></div>
-          Scraping...
+        <div className="absolute bottom-4 right-4">
+          <button
+            onClick={scrapeTextFromSelectedFiles}
+            disabled={scrapeButtonLoading} // Disable button while loading
+            className={`px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition ${scrapeButtonLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            {scrapeButtonLoading ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-4 border-white border-solid mr-2"></div>
+                Scraping...
+              </div>
+            ) : (
+              "Scrape Content"
+            )}
+          </button>
         </div>
-      ) : (
-        "Scrape Content"
       )}
-    </button>
-  </div>
-)}
     </div>
   );
 };
