@@ -3,8 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import JSZip from 'jszip';
-import { set } from "zod";
+import JSZip from "jszip";
 import { FaTrash } from "react-icons/fa";
 
 const Dashboard = () => {
@@ -22,24 +21,34 @@ const Dashboard = () => {
   const [selectedFileExtensions, setSelectedFileExtensions] = useState<string[]>([]); // Selected file extensions for filtering
   const [selectedFiles, setSelectedFiles] = useState<any[]>([]); // Selected files for embedding
   const [embedding, setEmbedding] = useState(false);
+  const [disabledExtensions, setDisabledExtensions] = useState<string[]>(["exe", "dll", "png"]); // Disabled file extensions
 
   // Extract file extensions from filesData
   const getFileExtensions = () => {
     const extensions = filesData.map((file) => {
-      const ext = file.path.split('.').pop(); // Get file extension
-      return ext || ''; // Return extension or empty string if no extension found
+      const ext = file.path.split(".").pop(); // Get file extension
+      return ext || ""; // Return extension or empty string if no extension found
     });
     return Array.from(new Set(extensions)); // Remove duplicates
   };
 
-  // Handle file extension filter selection
+  // Handle file extension filter selection and update selected files
   const handleFilterChange = (extension: string) => {
-    if (selectedFileExtensions.includes(extension)) {
-      setSelectedFileExtensions(selectedFileExtensions.filter((ext) => ext !== extension));
-    } else {
-      setSelectedFileExtensions([...selectedFileExtensions, extension]);
-    }
+    const newSelectedFileExtensions = selectedFileExtensions.includes(extension)
+      ? selectedFileExtensions.filter((ext) => ext !== extension)
+      : [...selectedFileExtensions, extension];
+
+    setSelectedFileExtensions(newSelectedFileExtensions);
+
+    // Filter out selected files that no longer match the selected extensions
+    const updatedSelectedFiles = selectedFiles.filter((file) => {
+      const ext = file.path.split('.').pop();
+      return newSelectedFileExtensions.includes(ext);
+    });
+
+    setSelectedFiles(updatedSelectedFiles);
   };
+
 
   // Handle file selection for embedding
   const handleFileSelection = (file: any) => {
@@ -50,10 +59,23 @@ const Dashboard = () => {
     }
   };
 
-  // Filter files based on selected extensions
+  // Toggle select/unselect all files
+  const handleSelectAllFiles = () => {
+    if (selectedFiles.length === filteredFiles.length) {
+      // If all files are selected, unselect them
+      setSelectedFiles([]);
+    } else {
+      // Otherwise, select all filtered files
+      setSelectedFiles(filteredFiles);
+    }
+  };
+
+
+  // Filter files based on selected extensions and disable the ones with disallowed extensions
   const filteredFiles = filesData.filter((file) => {
+    const ext = file.path.split(".").pop();
+    if (disabledExtensions.includes(ext)) return false; // Ignore disabled extensions
     if (selectedFileExtensions.length === 0) return true;
-    const ext = file.path.split('.').pop();
     return selectedFileExtensions.includes(ext);
   });
 
@@ -63,7 +85,7 @@ const Dashboard = () => {
       const response = await fetch(`https://api.github.com/user/repos?per_page=10&page=${page}&type=owner`, {
         headers: { Authorization: `token ${session?.accessToken}` },
       });
-      if (response.status != 200) handleDisconnect();
+      if (response.status !== 200) handleDisconnect();
       const data = await response.json();
       setRepositories(data);
     } catch (error) {
@@ -72,16 +94,16 @@ const Dashboard = () => {
   };
 
   // Parse GitHub repository URL
-  function parseRepoUrl(url) {
-    url = url.replace(/\/$/, '');
+  function parseRepoUrl(url: string) {
+    url = url.replace(/\/$/, "");
     const urlPattern = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(\/tree\/([^\/]+)(\/(.+))?)?$/;
     const match = url.match(urlPattern);
-    if (!match) throw new Error('Invalid GitHub repository URL.');
+    if (!match) throw new Error("Invalid GitHub repository URL.");
     return { owner: match[1], repo: match[2], refFromUrl: match[4], pathFromUrl: match[6] };
   }
 
   // Fetch branches for the selected repository
-  const fetchBranches = async (repoObj: { html_url: any; }) => {
+  const fetchBranches = async (repoObj: { html_url: any }) => {
     try {
       const { owner, repo } = parseRepoUrl(repoObj.html_url);
       setOwner(owner);
@@ -96,7 +118,7 @@ const Dashboard = () => {
   };
 
   // Handle repository selection
-  const handleRepoSelect = (repo: { html_url: any; }) => {
+  const handleRepoSelect = (repo: { html_url: any }) => {
     setSelectedRepo(repo);
     setSelectedBranch(null);
     setFilesData([]); // Reset files data when a new repo is selected
@@ -111,39 +133,48 @@ const Dashboard = () => {
     const repoUrl = selectedRepo.html_url;
     const { owner, repo } = parseRepoUrl(repoUrl);
 
-    const response = await fetch('/api/scrape-github', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/api/scrape-github", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ selectedRepos: [selectedRepo], token: session?.accessToken, owner: owner, repo: selectedRepo.name, branch: selectedBranch }),
     });
 
     if (response.ok) {
       const data = await response.json();
       setFilesData(data.filesData); // Set the file data array from the response
+  
+      // Automatically select all file extensions
+      const allExtensions = Array.from(new Set(data.filesData.map((file) => file.path.split(".").pop() || "")));
+      setSelectedFileExtensions(allExtensions);
     } else {
       console.error("Error scraping repository content");
     }
-
+  
     setScraping(false);
   };
 
   // Handle embedding content
-  const handleCreateEmbeddings = async (text,file_name) => {
+  const handleCreateEmbeddings = async () => {
     setEmbedding(true);
+    for (const file of selectedFiles) {
+      const response = await fetch("/api/create-embeddings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: file.text,
+          provider: "github",
+          namespace: `${owner}/${selectedRepo?.name}/${selectedBranch}/${file.path}`,
+          resourceId: `github/${owner}/${selectedRepo?.name}`,
+        }),
+      });
 
-    const response = await fetch('/api/create-embeddings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, provider: "github", namespace: `${owner}/${selectedRepo?.name}/${selectedBranch}/${file_name}`, resourceId: `github/${owner}/${selectedRepo?.name}` }),
-    });
 
-    if (response.ok) {
-      console.log("Embeddings created and stored in Pinecone");
-    } else {
-      console.error("Error creating embeddings");
+      if (!response.ok) {
+        console.error("Error creating embeddings");
+      }
     }
-
     setEmbedding(false);
+    console.log("Embeddings created and stored in Pinecone");
   };
 
   // Handle pagination
@@ -207,9 +238,7 @@ const Dashboard = () => {
               <li
                 key={repo.id}
                 onClick={() => handleRepoSelect(repo)}
-                className={`p-4 cursor-pointer flex items-center justify-between transition duration-200 ease-in-out transform hover:scale-105 hover:bg-gray-50 ${selectedRepo?.name === repo.name
-                    ? "bg-blue-50 border-l-4 border-blue-500 shadow-md scale-105"
-                    : ""
+                className={`p-4 cursor-pointer flex items-center justify-between transition duration-200 ease-in-out transform hover:scale-105 hover:bg-gray-50 ${selectedRepo?.name === repo.name ? "bg-blue-50 border-l-4 border-blue-500 shadow-md scale-105" : ""
                   }`}
               >
                 <span className="font-medium text-gray-800">{repo.name}</span>
@@ -221,12 +250,7 @@ const Dashboard = () => {
                     viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M5 13l4 4L19 7"
-                    ></path>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                   </svg>
                 )}
               </li>
@@ -239,9 +263,7 @@ const Dashboard = () => {
           <button
             onClick={handlePreviousPage}
             disabled={page === 1}
-            className={`px-5 py-2 rounded-lg transition duration-300 transform hover:scale-105 focus:outline-none ${page === 1
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-gray-300 text-gray-700 hover:bg-gray-400 hover:text-black"
+            className={`px-5 py-2 rounded-lg transition duration-300 transform hover:scale-105 focus:outline-none ${page === 1 ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-gray-300 text-gray-700 hover:bg-gray-400 hover:text-black"
               }`}
           >
             Previous
@@ -278,7 +300,7 @@ const Dashboard = () => {
       </div>
 
       {/* Main content section */}
-      <div className="w-2/3 p-6 bg-gray-200">
+      <div className="w-2/3 p-6 bg-gray-200 relative">
         <h2 className="text-2xl font-bold mb-6">Repository Content</h2>
 
         {/* Display file extensions as filters */}
@@ -292,8 +314,9 @@ const Dashboard = () => {
                   className="form-checkbox"
                   checked={selectedFileExtensions.includes(ext)}
                   onChange={() => handleFilterChange(ext)}
+                  disabled={disabledExtensions.includes(ext)}
                 />
-                <span className="text-gray-600">{ext}</span>
+                <span className={`${disabledExtensions.includes(ext) ? "text-red-500" : "text-gray-600"}`}>{ext}</span>
               </label>
             ))}
           </div>
@@ -317,26 +340,41 @@ const Dashboard = () => {
               {scraping ? "Scraping..." : "Scrape Repository"}
             </button>
 
-            {/* Scraped file content display with custom styling and scrollable textarea */}
+            {/* Scraped file content display with checkboxes */}
             {filesData.length > 0 && (
               <div className="mt-6 p-4 bg-white rounded-md shadow">
-                {filesData.map((file, index) => (
+                <button
+                  onClick={handleSelectAllFiles}
+                  className={`mb-4 px-4 py-2 rounded-lg transition duration-300 ${selectedFiles.length === filteredFiles.length
+                      ? "bg-red-500 text-white hover:bg-red-600" // Red for "Unselect All Files"
+                      : "bg-green-500 text-white hover:bg-green-600" // Green for "Select All Files"
+                    }`}
+                >
+                  {selectedFiles.length === filteredFiles.length ? "Unselect All Files" : "Select All Files"}
+                </button>
+
+
+                {filteredFiles.map((file, index) => (
                   <div key={index} className="mb-6">
-                    {/* File Header: Icon, Name, and Delete */}
+                    {/* File Header: Icon, Name, and Checkbox */}
                     <div className="flex justify-between items-center mb-2">
                       {/* File Name */}
                       <div className="flex items-center">
-                        <h4 className="text-xl font-bold text-gray-600 ml-2">
-                          {file.path}
-                        </h4>
+                        <input
+                          type="checkbox"
+                          checked={selectedFiles.includes(file)}
+                          onChange={() => handleFileSelection(file)}
+                          className="mr-2"
+                        />
+                        <h4 className="text-xl font-bold text-gray-600 ml-2">{file.path}</h4>
                       </div>
                     </div>
 
-                    {/* Text area for file content with increased height and scrollable view */}
+                    {/* Text area for file content */}
                     <div className="bg-white p-4 border rounded-lg max-h-96 overflow-auto">
                       <textarea
                         className="w-full h-64 border-none focus:outline-none"
-                        value={file.text} // Replace with `file.content` if needed
+                        value={file.text}
                         onChange={(e) => {
                           const newFilesData = [...filesData];
                           newFilesData[index].text = e.target.value;
@@ -344,22 +382,27 @@ const Dashboard = () => {
                         }}
                       />
                     </div>
-
-                    {/* Create Embeddings Button */}
-                    <button
-                      onClick={() => handleCreateEmbeddings(file.text,file.path)}
-                      className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-                    >
-                      Create Embeddings
-                    </button>
                   </div>
                 ))}
               </div>
             )}
-
           </div>
         ) : (
           <p>Please select a repository and branch to view the content.</p>
+        )}
+
+        {/* Create Embeddings Button in the bottom-right corner */}
+        {selectedFiles.length > 0 && (
+          <div className="fixed bottom-6 right-6">
+            <button
+              onClick={handleCreateEmbeddings}
+              className={`px-6 py-3 bg-blue-500 text-white rounded-lg shadow-lg hover:bg-blue-600 ${embedding ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              disabled={embedding}
+            >
+              {embedding ? "Creating Embeddings..." : "Create Embeddings for Selected Files"}
+            </button>
+          </div>
         )}
       </div>
     </div>
