@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import JSZip from "jszip";
+import { FaTrash } from "react-icons/fa";
 
 const Dashboard = () => {
   const { data: session, status } = useSession();
@@ -16,19 +17,75 @@ const Dashboard = () => {
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
   const [page, setPage] = useState<number>(1);
   const [scraping, setScraping] = useState(false);
-  const [scrapedContent, setScrapedContent] = useState<string | null>(null);
+  const [filesData, setFilesData] = useState<any[]>([]); // Array to store file data
+  const [selectedFileExtensions, setSelectedFileExtensions] = useState<string[]>([]); // Selected file extensions for filtering
+  const [selectedFiles, setSelectedFiles] = useState<any[]>([]); // Selected files for embedding
   const [embedding, setEmbedding] = useState(false);
+  const [disabledExtensions, setDisabledExtensions] = useState<string[]>(["exe", "dll", "png"]); // Disabled file extensions
+
+  // Extract file extensions from filesData
+  const getFileExtensions = () => {
+    const extensions = filesData.map((file) => {
+      const ext = file.path.split(".").pop(); // Get file extension
+      return ext || ""; // Return extension or empty string if no extension found
+    });
+    return Array.from(new Set(extensions)); // Remove duplicates
+  };
+
+  // Handle file extension filter selection and update selected files
+  const handleFilterChange = (extension: string) => {
+    const newSelectedFileExtensions = selectedFileExtensions.includes(extension)
+      ? selectedFileExtensions.filter((ext) => ext !== extension)
+      : [...selectedFileExtensions, extension];
+
+    setSelectedFileExtensions(newSelectedFileExtensions);
+
+    // Filter out selected files that no longer match the selected extensions
+    const updatedSelectedFiles = selectedFiles.filter((file) => {
+      const ext = file.path.split('.').pop();
+      return newSelectedFileExtensions.includes(ext);
+    });
+
+    setSelectedFiles(updatedSelectedFiles);
+  };
+
+
+  // Handle file selection for embedding
+  const handleFileSelection = (file: any) => {
+    if (selectedFiles.includes(file)) {
+      setSelectedFiles(selectedFiles.filter((selectedFile) => selectedFile !== file));
+    } else {
+      setSelectedFiles([...selectedFiles, file]);
+    }
+  };
+
+  // Toggle select/unselect all files
+  const handleSelectAllFiles = () => {
+    if (selectedFiles.length === filteredFiles.length) {
+      // If all files are selected, unselect them
+      setSelectedFiles([]);
+    } else {
+      // Otherwise, select all filtered files
+      setSelectedFiles(filteredFiles);
+    }
+  };
+
+
+  // Filter files based on selected extensions and disable the ones with disallowed extensions
+  const filteredFiles = filesData.filter((file) => {
+    const ext = file.path.split(".").pop();
+    if (disabledExtensions.includes(ext)) return false; // Ignore disabled extensions
+    if (selectedFileExtensions.length === 0) return true;
+    return selectedFileExtensions.includes(ext);
+  });
 
   // Fetch GitHub repositories
   const fetchRepositories = async (page: number) => {
     try {
-      const response = await fetch(
-        `https://api.github.com/user/repos?per_page=10&page=${page}&type=owner`,
-        {
-          headers: { Authorization: `token ${session?.accessToken}` },
-        }
-      );
-      if (response.status != 200) handleDisconnect();
+      const response = await fetch(`https://api.github.com/user/repos?per_page=10&page=${page}&type=owner`, {
+        headers: { Authorization: `token ${session?.accessToken}` },
+      });
+      if (response.status !== 200) handleDisconnect();
       const data = await response.json();
       setRepositories(data);
     } catch (error) {
@@ -37,18 +94,12 @@ const Dashboard = () => {
   };
 
   // Parse GitHub repository URL
-  function parseRepoUrl(url) {
+  function parseRepoUrl(url: string) {
     url = url.replace(/\/$/, "");
-    const urlPattern =
-      /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(\/tree\/([^\/]+)(\/(.+))?)?$/;
+    const urlPattern = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(\/tree\/([^\/]+)(\/(.+))?)?$/;
     const match = url.match(urlPattern);
     if (!match) throw new Error("Invalid GitHub repository URL.");
-    return {
-      owner: match[1],
-      repo: match[2],
-      refFromUrl: match[4],
-      pathFromUrl: match[6],
-    };
+    return { owner: match[1], repo: match[2], refFromUrl: match[4], pathFromUrl: match[6] };
   }
 
   // Fetch branches for the selected repository
@@ -56,12 +107,9 @@ const Dashboard = () => {
     try {
       const { owner, repo } = parseRepoUrl(repoObj.html_url);
       setOwner(owner);
-      const response = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/branches`,
-        {
-          headers: { Authorization: `token ${session?.accessToken}` },
-        }
-      );
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches`, {
+        headers: { Authorization: `token ${session?.accessToken}` },
+      });
       const data = await response.json();
       setBranches(data);
     } catch (error) {
@@ -73,14 +121,14 @@ const Dashboard = () => {
   const handleRepoSelect = (repo: { html_url: any }) => {
     setSelectedRepo(repo);
     setSelectedBranch(null);
-    setScrapedContent(null);
+    setFilesData([]); // Reset files data when a new repo is selected
     fetchBranches(repo);
   };
 
   // Handle scraping content
   const handleScrape = async () => {
     setScraping(true);
-    setScrapedContent(null);
+    setFilesData([]);
 
     const repoUrl = selectedRepo.html_url;
     const { owner, repo } = parseRepoUrl(repoUrl);
@@ -88,18 +136,16 @@ const Dashboard = () => {
     const response = await fetch("/api/scrape-github", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        selectedRepos: [selectedRepo],
-        token: session?.accessToken,
-        owner: owner,
-        repo: selectedRepo.name,
-        branch: selectedBranch,
-      }),
+      body: JSON.stringify({ selectedRepos: [selectedRepo], token: session?.accessToken, owner: owner, repo: selectedRepo.name, branch: selectedBranch }),
     });
 
     if (response.ok) {
       const data = await response.json();
-      setScrapedContent(data.formattedText);
+      setFilesData(data.filesData); // Set the file data array from the response
+
+      // Automatically select all file extensions
+      const allExtensions = Array.from(new Set(data.filesData.map((file) => file.path.split(".").pop() || "")));
+      setSelectedFileExtensions(allExtensions);
     } else {
       console.error("Error scraping repository content");
     }
@@ -110,25 +156,26 @@ const Dashboard = () => {
   // Handle embedding content
   const handleCreateEmbeddings = async () => {
     setEmbedding(true);
+    for (const file of selectedFiles) {
+      const response = await fetch("/api/create-embeddings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: file.text,
+          provider: "github",
+          namespace: `${owner}/${selectedRepo?.name}/${selectedBranch}/${file.path}`,
+          resourceId: `github/${owner}/${selectedRepo?.name}`,
+        }),
+      });
 
-    const response = await fetch("/api/create-embeddings", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: scrapedContent,
-        provider: "github",
-        namespace: `${owner}/${selectedRepo?.name}/${selectedBranch}`,
-        resourceId: `github/${owner}`,
-      }),
-    });
+    
 
-    if (response.ok) {
-      console.log("Embeddings created and stored in Pinecone");
-    } else {
-      console.error("Error creating embeddings");
+      if (!response.ok) {
+        console.error("Error creating embeddings");
+      }
     }
-
     setEmbedding(false);
+    console.log("Embeddings created and stored in Pinecone");
   };
 
   // Handle pagination
@@ -196,11 +243,8 @@ const Dashboard = () => {
               <li
                 key={repo.id}
                 onClick={() => handleRepoSelect(repo)}
-                className={`p-4 cursor-pointer flex items-center justify-between transition duration-200 ease-in-out transform hover:scale-105 hover:bg-gray-50 ${
-                  selectedRepo?.name === repo.name
-                    ? "bg-blue-50 border-l-4 border-blue-500 shadow-md scale-105"
-                    : ""
-                }`}
+                className={`p-4 cursor-pointer flex items-center justify-between transition duration-200 ease-in-out transform hover:scale-105 hover:bg-gray-50 ${selectedRepo?.name === repo.name ? "bg-blue-50 border-l-4 border-blue-500 shadow-md scale-105" : ""
+                  }`}
               >
                 <span className="font-medium text-gray-800">{repo.name}</span>
                 {selectedRepo?.name === repo.name && (
@@ -211,12 +255,7 @@ const Dashboard = () => {
                     viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M5 13l4 4L19 7"
-                    ></path>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                   </svg>
                 )}
               </li>
@@ -229,11 +268,8 @@ const Dashboard = () => {
           <button
             onClick={handlePreviousPage}
             disabled={page === 1}
-            className={`px-5 py-2 rounded-lg transition duration-300 transform hover:scale-105 focus:outline-none ${
-              page === 1
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-gray-300 text-gray-700 hover:bg-gray-400 hover:text-black"
-            }`}
+            className={`px-5 py-2 rounded-lg transition duration-300 transform hover:scale-105 focus:outline-none ${page === 1 ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-gray-300 text-gray-700 hover:bg-gray-400 hover:text-black"
+              }`}
           >
             Previous
           </button>
@@ -270,23 +306,44 @@ const Dashboard = () => {
         )}
       </div>
 
-      <div className="w-2/3 p-6 bg-gray-200">
-        <h2 className="text-2xl font-bold mb-6">Repository Content</h2>
+      {/* Main content section */}
+      <div className="w-2/3 p-6 bg-gray-200 relative animate-fadeIn transition-all duration-500">
+        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b-2 pb-2 border-gray-300">Repository Content</h2>
+
+        {/* Display file extensions as filters */}
+        <div className="mb-6">
+          <h3 className="text-lg font-bold text-gray-700">Filter by File Type:</h3>
+          <div className="flex space-x-4 mt-2 animate-slideIn transition-all duration-300 ease-in-out">
+            {getFileExtensions().map((ext, index) => (
+              <label key={index} className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="form-checkbox transition duration-200 ease-in-out transform hover:scale-110 focus:ring focus:ring-blue-500"
+                  checked={selectedFileExtensions.includes(ext)}
+                  onChange={() => handleFilterChange(ext)}
+                  disabled={disabledExtensions.includes(ext)}
+                />
+                <span className={`${disabledExtensions.includes(ext) ? "text-red-500" : "text-gray-600"} transition-colors duration-200`}>
+                  {ext}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
 
         {selectedRepo && selectedBranch ? (
-          <div>
-            <p>
+          <div className="animate-fadeIn transition-opacity duration-500">
+            <p className="text-lg font-semibold text-gray-700 mb-2">
               <strong>Repository:</strong> {selectedRepo.name}
             </p>
-            <p>
+            <p className="text-lg font-semibold text-gray-700 mb-4">
               <strong>Branch:</strong> {selectedBranch}
             </p>
 
             <button
               onClick={handleScrape}
-              className={`mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition ${
-                scraping ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+              className={`mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-transform duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-lg ${scraping ? "opacity-50 cursor-not-allowed" : ""
+                }`}
               disabled={scraping}
             >
               {scraping ? "Scraping..." : "Scrape Repository"}
@@ -303,22 +360,70 @@ const Dashboard = () => {
                 </div>
 
                 {/* Create Embeddings Button */}
+            {/* Scraped file content display with checkboxes */}
+            {filesData.length > 0 && (
+              <div className="mt-6 p-6 bg-white rounded-md shadow-lg animate-fadeIn transition-all duration-500">
                 <button
-                  onClick={handleCreateEmbeddings}
-                  className={`mt-4 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition ${
-                    embedding ? "opacity-50 cursor-not-allowed" : ""
-                  }`}
-                  disabled={embedding}
+                  onClick={handleSelectAllFiles}
+                  className={`mb-4 px-4 py-2 rounded-lg shadow-lg transition duration-300 transform hover:scale-105 ${selectedFiles.length === filteredFiles.length
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : "bg-green-500 text-white hover:bg-green-600"
+                    }`}
                 >
-                  {embedding ? "Creating Embeddings..." : "Create Embeddings"}
+                  {selectedFiles.length === filteredFiles.length ? "Unselect All Files" : "Select All Files"}
                 </button>
+
+                {filteredFiles.map((file, index) => (
+                  <div key={index} className="mb-6">
+                    {/* File Header: Icon, Name, and Checkbox */}
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedFiles.includes(file)}
+                          onChange={() => handleFileSelection(file)}
+                          className="mr-2 transition-transform duration-200 transform hover:scale-110"
+                        />
+                        <h4 className="text-xl font-bold text-gray-600 ml-2">{file.path}</h4>
+                      </div>
+                    </div>
+
+                    {/* Text area for file content */}
+                    <div className="bg-white p-4 border rounded-lg max-h-96 overflow-auto shadow-inner transition-shadow duration-300 hover:shadow-lg">
+                      <textarea
+                        className="w-full h-64 border-none focus:outline-none transition-transform duration-200 transform hover:scale-105"
+                        value={file.text}
+                        onChange={(e) => {
+                          const newFilesData = [...filesData];
+                          newFilesData[index].text = e.target.value;
+                          setFilesData(newFilesData);
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         ) : (
-          <p>Please select a repository and branch to view the content.</p>
+          <p className="text-lg text-gray-600">Please select a repository and branch to view the content.</p>
+        )}
+
+        {/* Create Embeddings Button in the bottom-right corner */}
+        {selectedFiles.length > 0 && (
+          <div className="fixed bottom-6 right-6 animate-fadeIn transition-opacity duration-500">
+            <button
+              onClick={handleCreateEmbeddings}
+              className={`px-6 py-3 bg-blue-500 text-white rounded-lg shadow-xl transition-transform duration-300 hover:scale-105 hover:bg-blue-600 ${embedding ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              disabled={embedding}
+            >
+              {embedding ? "Creating Embeddings..." : "Create Embeddings for Selected Files"}
+            </button>
+          </div>
         )}
       </div>
+
     </div>
   );
 };
