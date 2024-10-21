@@ -142,14 +142,14 @@ const Dashboard = () => {
     if (response.ok) {
       const data = await response.json();
       setFilesData(data.filesData); // Set the file data array from the response
-  
+
       // Automatically select all file extensions
       const allExtensions = Array.from(new Set(data.filesData.map((file) => file.path.split(".").pop() || "")));
       setSelectedFileExtensions(allExtensions);
     } else {
       console.error("Error scraping repository content");
     }
-  
+
     setScraping(false);
   };
 
@@ -300,40 +300,42 @@ const Dashboard = () => {
       </div>
 
       {/* Main content section */}
-      <div className="w-2/3 p-6 bg-gray-200 relative">
-        <h2 className="text-2xl font-bold mb-6">Repository Content</h2>
+      <div className="w-2/3 p-6 bg-gray-200 relative animate-fadeIn transition-all duration-500">
+        <h2 className="text-2xl font-bold mb-6 text-gray-800 border-b-2 pb-2 border-gray-300">Repository Content</h2>
 
         {/* Display file extensions as filters */}
         <div className="mb-6">
-          <h3 className="text-lg font-bold">Filter by File Type:</h3>
-          <div className="flex space-x-4 mt-2">
+          <h3 className="text-lg font-bold text-gray-700">Filter by File Type:</h3>
+          <div className="flex space-x-4 mt-2 animate-slideIn transition-all duration-300 ease-in-out">
             {getFileExtensions().map((ext, index) => (
-              <label key={index} className="flex items-center space-x-2">
+              <label key={index} className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  className="form-checkbox"
+                  className="form-checkbox transition duration-200 ease-in-out transform hover:scale-110 focus:ring focus:ring-blue-500"
                   checked={selectedFileExtensions.includes(ext)}
                   onChange={() => handleFilterChange(ext)}
                   disabled={disabledExtensions.includes(ext)}
                 />
-                <span className={`${disabledExtensions.includes(ext) ? "text-red-500" : "text-gray-600"}`}>{ext}</span>
+                <span className={`${disabledExtensions.includes(ext) ? "text-red-500" : "text-gray-600"} transition-colors duration-200`}>
+                  {ext}
+                </span>
               </label>
             ))}
           </div>
         </div>
 
         {selectedRepo && selectedBranch ? (
-          <div>
-            <p>
+          <div className="animate-fadeIn transition-opacity duration-500">
+            <p className="text-lg font-semibold text-gray-700 mb-2">
               <strong>Repository:</strong> {selectedRepo.name}
             </p>
-            <p>
+            <p className="text-lg font-semibold text-gray-700 mb-4">
               <strong>Branch:</strong> {selectedBranch}
             </p>
 
             <button
               onClick={handleScrape}
-              className={`mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition ${scraping ? "opacity-50 cursor-not-allowed" : ""
+              className={`mt-4 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-transform duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-lg ${scraping ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               disabled={scraping}
             >
@@ -342,38 +344,36 @@ const Dashboard = () => {
 
             {/* Scraped file content display with checkboxes */}
             {filesData.length > 0 && (
-              <div className="mt-6 p-4 bg-white rounded-md shadow">
+              <div className="mt-6 p-6 bg-white rounded-md shadow-lg animate-fadeIn transition-all duration-500">
                 <button
                   onClick={handleSelectAllFiles}
-                  className={`mb-4 px-4 py-2 rounded-lg transition duration-300 ${selectedFiles.length === filteredFiles.length
-                      ? "bg-red-500 text-white hover:bg-red-600" // Red for "Unselect All Files"
-                      : "bg-green-500 text-white hover:bg-green-600" // Green for "Select All Files"
+                  className={`mb-4 px-4 py-2 rounded-lg shadow-lg transition duration-300 transform hover:scale-105 ${selectedFiles.length === filteredFiles.length
+                    ? "bg-red-500 text-white hover:bg-red-600"
+                    : "bg-green-500 text-white hover:bg-green-600"
                     }`}
                 >
                   {selectedFiles.length === filteredFiles.length ? "Unselect All Files" : "Select All Files"}
                 </button>
 
-
                 {filteredFiles.map((file, index) => (
                   <div key={index} className="mb-6">
                     {/* File Header: Icon, Name, and Checkbox */}
                     <div className="flex justify-between items-center mb-2">
-                      {/* File Name */}
                       <div className="flex items-center">
                         <input
                           type="checkbox"
                           checked={selectedFiles.includes(file)}
                           onChange={() => handleFileSelection(file)}
-                          className="mr-2"
+                          className="mr-2 transition-transform duration-200 transform hover:scale-110"
                         />
                         <h4 className="text-xl font-bold text-gray-600 ml-2">{file.path}</h4>
                       </div>
                     </div>
 
                     {/* Text area for file content */}
-                    <div className="bg-white p-4 border rounded-lg max-h-96 overflow-auto">
+                    <div className="bg-white p-4 border rounded-lg max-h-96 overflow-auto shadow-inner transition-shadow duration-300 hover:shadow-lg">
                       <textarea
-                        className="w-full h-64 border-none focus:outline-none"
+                        className="w-full h-64 border-none focus:outline-none transition-transform duration-200 transform hover:scale-105"
                         value={file.text}
                         onChange={(e) => {
                           const newFilesData = [...filesData];
@@ -388,15 +388,15 @@ const Dashboard = () => {
             )}
           </div>
         ) : (
-          <p>Please select a repository and branch to view the content.</p>
+          <p className="text-lg text-gray-600">Please select a repository and branch to view the content.</p>
         )}
 
         {/* Create Embeddings Button in the bottom-right corner */}
         {selectedFiles.length > 0 && (
-          <div className="fixed bottom-6 right-6">
+          <div className="fixed bottom-6 right-6 animate-fadeIn transition-opacity duration-500">
             <button
               onClick={handleCreateEmbeddings}
-              className={`px-6 py-3 bg-blue-500 text-white rounded-lg shadow-lg hover:bg-blue-600 ${embedding ? "opacity-50 cursor-not-allowed" : ""
+              className={`px-6 py-3 bg-blue-500 text-white rounded-lg shadow-xl transition-transform duration-300 hover:scale-105 hover:bg-blue-600 ${embedding ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               disabled={embedding}
             >
@@ -405,6 +405,7 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
     </div>
   );
 };
