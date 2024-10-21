@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import JSZip from 'jszip';
+import JSZip, { file } from 'jszip';
 
 // Parse GitHub repository URL
 function parseRepoUrl(url) {
@@ -130,6 +130,10 @@ export async function POST(request) {
       )
       .join('\n\n');
 
+    console.log("Repo Results", repoResults)
+    
+    let files = repoResults[0].fileContents
+
     // Generate ZIP file with all repositories' content
     const zip = await createAndDownloadZip(repoResults);
 
@@ -137,6 +141,7 @@ export async function POST(request) {
     return NextResponse.json({
       formattedText,
       zipContent: zip, // You can send this in a different format if needed
+      filesData: files
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
