@@ -1,16 +1,17 @@
 // app/layout.tsx (server component)
 
-import './globals.css';
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import "./globals.css";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/toaster";
-import SessionProviderWrapper from '@/components/session-provider-wrapper'; // Import the client-side wrapper
+import SessionProviderWrapper from "@/components/session-provider-wrapper"; // Import the client-side wrapper
+import { ModeToggle } from "@/components/Toggle";
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'EmbedHub'
+  title: "EmbedHub",
 };
 
 export default function RootLayout({
@@ -28,9 +29,8 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {/* Wrap the children with SessionProviderWrapper */}
-          <SessionProviderWrapper>
-            {children}
-          </SessionProviderWrapper>
+          <ModeToggle />
+          <SessionProviderWrapper>{children}</SessionProviderWrapper>
           <Toaster />
         </ThemeProvider>
       </body>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import JSZip from 'jszip';
+import JSZip from "jszip";
 
 const Dashboard = () => {
   const { data: session, status } = useSession();
@@ -22,9 +22,12 @@ const Dashboard = () => {
   // Fetch GitHub repositories
   const fetchRepositories = async (page: number) => {
     try {
-      const response = await fetch(`https://api.github.com/user/repos?per_page=10&page=${page}&type=owner`, {
-        headers: { Authorization: `token ${session?.accessToken}` },
-      });
+      const response = await fetch(
+        `https://api.github.com/user/repos?per_page=10&page=${page}&type=owner`,
+        {
+          headers: { Authorization: `token ${session?.accessToken}` },
+        }
+      );
       if (response.status != 200) handleDisconnect();
       const data = await response.json();
       setRepositories(data);
@@ -35,21 +38,30 @@ const Dashboard = () => {
 
   // Parse GitHub repository URL
   function parseRepoUrl(url) {
-    url = url.replace(/\/$/, '');
-    const urlPattern = /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(\/tree\/([^\/]+)(\/(.+))?)?$/;
+    url = url.replace(/\/$/, "");
+    const urlPattern =
+      /^https:\/\/github\.com\/([^\/]+)\/([^\/]+)(\/tree\/([^\/]+)(\/(.+))?)?$/;
     const match = url.match(urlPattern);
-    if (!match) throw new Error('Invalid GitHub repository URL.');
-    return { owner: match[1], repo: match[2], refFromUrl: match[4], pathFromUrl: match[6] };
+    if (!match) throw new Error("Invalid GitHub repository URL.");
+    return {
+      owner: match[1],
+      repo: match[2],
+      refFromUrl: match[4],
+      pathFromUrl: match[6],
+    };
   }
 
   // Fetch branches for the selected repository
-  const fetchBranches = async (repoObj: { html_url: any; }) => {
+  const fetchBranches = async (repoObj: { html_url: any }) => {
     try {
       const { owner, repo } = parseRepoUrl(repoObj.html_url);
-      setOwner(owner)
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/branches`, {
-        headers: { Authorization: `token ${session?.accessToken}` },
-      });
+      setOwner(owner);
+      const response = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/branches`,
+        {
+          headers: { Authorization: `token ${session?.accessToken}` },
+        }
+      );
       const data = await response.json();
       setBranches(data);
     } catch (error) {
@@ -58,7 +70,7 @@ const Dashboard = () => {
   };
 
   // Handle repository selection
-  const handleRepoSelect = (repo: { html_url: any; }) => {
+  const handleRepoSelect = (repo: { html_url: any }) => {
     setSelectedRepo(repo);
     setSelectedBranch(null);
     setScrapedContent(null);
@@ -73,10 +85,16 @@ const Dashboard = () => {
     const repoUrl = selectedRepo.html_url;
     const { owner, repo } = parseRepoUrl(repoUrl);
 
-    const response = await fetch('/api/scrape-github', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ selectedRepos: [selectedRepo], token: session?.accessToken, owner: owner, repo: selectedRepo.name, branch: selectedBranch }),
+    const response = await fetch("/api/scrape-github", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        selectedRepos: [selectedRepo],
+        token: session?.accessToken,
+        owner: owner,
+        repo: selectedRepo.name,
+        branch: selectedBranch,
+      }),
     });
 
     if (response.ok) {
@@ -93,10 +111,15 @@ const Dashboard = () => {
   const handleCreateEmbeddings = async () => {
     setEmbedding(true);
 
-    const response = await fetch('/api/create-embeddings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: scrapedContent, provider: "github", namespace:`${owner}/${selectedRepo?.name}/${selectedBranch}`, resourceId: `github/${owner}` }),
+    const response = await fetch("/api/create-embeddings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: scrapedContent,
+        provider: "github",
+        namespace: `${owner}/${selectedRepo?.name}/${selectedBranch}`,
+        resourceId: `github/${owner}`,
+      }),
     });
 
     if (response.ok) {
@@ -136,7 +159,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen flex">
-      <div className="w-1/3 p-6 bg-gray-100 relative">
+      <div className="w-1/3 p-6 bg-gray-100 dark:bg-[#191919]  relative">
         <div className="absolute top-4 right-4">
           <button
             onClick={handleDisconnect}
@@ -150,7 +173,9 @@ const Dashboard = () => {
 
         {/* Access Token */}
         <div className="mb-6">
-          <label className="block text-lg font-semibold text-gray-800">Access Token</label>
+          <label className="block text-lg font-semibold text-gray-800">
+            Access Token
+          </label>
           <div className="relative mt-2">
             <input
               type="text"
@@ -163,7 +188,9 @@ const Dashboard = () => {
 
         {/* Repositories List */}
         <div className="mb-6">
-          <label className="block text-lg font-semibold text-gray-800">Select Repository</label>
+          <label className="block text-lg font-semibold text-gray-800">
+            Select Repository
+          </label>
           <ul className="mt-3 border border-gray-300 rounded-lg divide-y divide-gray-200 h-60 overflow-y-scroll shadow-lg">
             {repositories.map((repo) => (
               <li
@@ -222,7 +249,9 @@ const Dashboard = () => {
         {/* Branch Selection */}
         {selectedRepo && (
           <div className="mb-6">
-            <label className="block text-lg font-semibold text-gray-800">Select Branch</label>
+            <label className="block text-lg font-semibold text-gray-800">
+              Select Branch
+            </label>
             <select
               onChange={(e) => setSelectedBranch(e.target.value)}
               value={selectedBranch || ""}
@@ -266,8 +295,12 @@ const Dashboard = () => {
             {/* Scraped content display */}
             {scrapedContent && (
               <div className="mt-6 p-4 bg-white rounded-md shadow">
-                <h3 className="text-lg font-bold">Scraped Content</h3>
-                <pre className="whitespace-pre-wrap break-words">{scrapedContent}</pre>
+                <div className="h-96 overflow-y-scroll ">
+                  <h3 className="text-lg font-bold">Scraped Content</h3>
+                  <pre className="whitespace-pre-wrap break-words">
+                    {scrapedContent}
+                  </pre>
+                </div>
 
                 {/* Create Embeddings Button */}
                 <button

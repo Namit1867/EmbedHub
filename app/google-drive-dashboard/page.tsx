@@ -3,7 +3,16 @@
 import React, { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { FaFolder, FaFileAlt, FaFileWord, FaFilePdf, FaFilePowerpoint, FaFileImage, FaFileVideo, FaTrash } from "react-icons/fa";
+import {
+  FaFolder,
+  FaFileAlt,
+  FaFileWord,
+  FaFilePdf,
+  FaFilePowerpoint,
+  FaFileImage,
+  FaFileVideo,
+  FaTrash,
+} from "react-icons/fa";
 
 const GoogleDriveDashboard = () => {
   const { data: session, status } = useSession();
@@ -21,9 +30,12 @@ const GoogleDriveDashboard = () => {
   const fetchDriveFiles = async (folderId = "root", pageToken = "") => {
     setLoading(true); // Set loader to true before fetching
     try {
-      const response = await fetch(`/api/drive?token=${session?.accessToken}&folderId=${folderId}&pageToken=${pageToken}`, {
-        method: "GET",
-      });
+      const response = await fetch(
+        `/api/drive?token=${session?.accessToken}&folderId=${folderId}&pageToken=${pageToken}`,
+        {
+          method: "GET",
+        }
+      );
       if (response.status !== 200) handleDisconnect();
       const data = await response.json();
       setFiles(data.files);
@@ -38,7 +50,7 @@ const GoogleDriveDashboard = () => {
   // Handle folder navigation (double-click to open folders)
   const handleFolderOpen = (folderId, folderName) => {
     setFolderStack([...folderStack, { id: folderId, name: folderName }]);
-    setSearchQuery("");  // Clear the search query when a folder is opened
+    setSearchQuery(""); // Clear the search query when a folder is opened
     fetchDriveFiles(folderId);
   };
 
@@ -49,17 +61,20 @@ const GoogleDriveDashboard = () => {
       return; // Do not select folders
     }
 
-    const alreadySelected = selectedFiles.find((selectedFile) => selectedFile.id === file.id);
+    const alreadySelected = selectedFiles.find(
+      (selectedFile) => selectedFile.id === file.id
+    );
 
     if (alreadySelected) {
       // Remove from selected files if already selected
-      setSelectedFiles(selectedFiles.filter((selectedFile) => selectedFile.id !== file.id));
+      setSelectedFiles(
+        selectedFiles.filter((selectedFile) => selectedFile.id !== file.id)
+      );
     } else {
       // Add to selected files
       setSelectedFiles([...selectedFiles, file]);
     }
   };
-
 
   // Handle removing a file from the selected list
   const handleRemoveFile = (fileId) => {
@@ -70,7 +85,9 @@ const GoogleDriveDashboard = () => {
   const handleGoBack = () => {
     const newStack = folderStack.slice(0, -1);
     setFolderStack(newStack);
-    fetchDriveFiles(newStack.length ? newStack[newStack.length - 1].id : "root");
+    fetchDriveFiles(
+      newStack.length ? newStack[newStack.length - 1].id : "root"
+    );
   };
 
   // Handle pagination (Next)
@@ -118,9 +135,19 @@ const GoogleDriveDashboard = () => {
       return <FaFolder className="text-yellow-500" />;
     } else if (mimeType.includes("application/pdf")) {
       return <FaFilePdf className="text-red-500" />;
-    } else if (mimeType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document") || mimeType.includes(".doc")) {
+    } else if (
+      mimeType.includes(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ) ||
+      mimeType.includes(".doc")
+    ) {
       return <FaFileWord className="text-blue-500" />;
-    } else if (mimeType.includes("application/vnd.openxmlformats-officedocument.presentationml.presentation") || mimeType.includes(".ppt")) {
+    } else if (
+      mimeType.includes(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      ) ||
+      mimeType.includes(".ppt")
+    ) {
       return <FaFilePowerpoint className="text-orange-500" />;
     } else if (mimeType.includes("image/")) {
       return <FaFileImage className="text-green-500" />;
@@ -132,7 +159,7 @@ const GoogleDriveDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+    <div className="min-h-screen flex flex-col items-center justify-center ">
       {/* Disconnect Button */}
       <div className="absolute top-4 right-4">
         <button
@@ -144,9 +171,11 @@ const GoogleDriveDashboard = () => {
       </div>
 
       {/* Google Drive File Picker */}
-      <div className="w-full max-w-5xl bg-white rounded-lg shadow-lg p-6">
+      <div className="w-full max-w-5xl dark:bg-[#1D1E21] rounded-lg shadow-lg p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-700">Google Drive</h2>
+          <h2 className="text-2xl font-bold text-gray-700 dark:text-white ">
+            Google Drive
+          </h2>
 
           {/* Search Bar */}
           <input
@@ -161,7 +190,7 @@ const GoogleDriveDashboard = () => {
         {/* Loader */}
         {loading && (
           <div className="flex justify-center items-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid border-gray-200"></div>
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid "></div>
           </div>
         )}
 
@@ -170,18 +199,29 @@ const GoogleDriveDashboard = () => {
           {!loading && (
             <table className="min-w-full table-auto">
               <thead>
-                <tr className="bg-gray-200">
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">Icon</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">Name</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-600">Last Modified</th>
+                <tr className="bg-gray-200 dark:bg-[#191919] ">
+                  <th className="px-4 py-2 text-left font-medium text-gray-600">
+                    Icon
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600">
+                    Name
+                  </th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-600">
+                    Last Modified
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredFiles.map((file) => (
                   <tr
                     key={file.id}
-                    className={`cursor-pointer transition hover:bg-gray-100 ${selectedFiles.find((selectedFile) => selectedFile.id === file.id) ? "bg-blue-50" : ""
-                      }`}
+                    className={`cursor-pointer transition hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                      selectedFiles.find(
+                        (selectedFile) => selectedFile.id === file.id
+                      )
+                        ? "bg-blue-50 dark:bg-gray-600 "
+                        : ""
+                    }`}
                     onClick={() => handleFileSelect(file)}
                     onDoubleClick={() =>
                       file.mimeType === "application/vnd.google-apps.folder"
@@ -191,7 +231,9 @@ const GoogleDriveDashboard = () => {
                   >
                     <td className="px-4 py-2">{getFileIcon(file.mimeType)}</td>
                     <td className="px-4 py-2">{file.name}</td>
-                    <td className="px-4 py-2">{new Date(file.modifiedTime).toLocaleDateString()}</td>
+                    <td className="px-4 py-2">
+                      {new Date(file.modifiedTime).toLocaleDateString()}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -205,7 +247,10 @@ const GoogleDriveDashboard = () => {
             <h3 className="text-xl font-bold text-gray-700">Selected Files</h3>
             <div className="flex flex-wrap mt-4">
               {selectedFiles.map((file) => (
-                <div key={file.id} className="flex items-center bg-gray-200 px-4 py-2 rounded-lg mr-2 mb-2">
+                <div
+                  key={file.id}
+                  className="flex items-center bg-gray-200 dark:bg-gray-800 px-4 py-2 rounded-lg mr-2 mb-2"
+                >
                   <span className="mr-2">{file.name}</span>
                   <FaTrash
                     className="text-red-500 cursor-pointer hover:text-red-700"
@@ -222,16 +267,20 @@ const GoogleDriveDashboard = () => {
           <button
             onClick={handlePreviousPage}
             disabled={previousPageTokens.length === 0 || loading} // Disable when loading
-            className={`px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition ${previousPageTokens.length === 0 || loading ? "cursor-not-allowed opacity-50" : ""
-              }`}
+            className={`px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition ${
+              previousPageTokens.length === 0 || loading
+                ? "cursor-not-allowed opacity-50"
+                : ""
+            }`}
           >
             Previous
           </button>
           <button
             onClick={handleNextPage}
             disabled={!nextPageToken || loading} // Disable when loading
-            className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${!nextPageToken || loading ? "cursor-not-allowed opacity-50" : ""
-              }`}
+            className={`px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition ${
+              !nextPageToken || loading ? "cursor-not-allowed opacity-50" : ""
+            }`}
           >
             Next
           </button>
