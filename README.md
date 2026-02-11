@@ -1,4 +1,4 @@
-# EmbedHub
+# EmbedHubs
 
 A powerful Next.js application that enables seamless content extraction and AI processing from GitHub repositories and Google Drive files. EmbedHub provides intuitive dashboards for browsing, selecting, and scraping content, then generates embeddings for advanced content analysis.
 
